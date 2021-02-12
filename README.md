@@ -16,7 +16,7 @@ Has some additional goodies:
 ## Cavets and Issues
 
 1. Idler requires the game be in focus.  The script will bring the app to the foreground when needed (which is a lot).  This may mean that it runs mostly overnight for you (I have an old mac I run Idle Champions on)
-2. Idler uses image matching and saved, app must be configured using the settings below.
+2. Idler uses image matching and saved, app must be configured using Resolution 1280x720 and UI Scale 100%
 2. Idler has not been tested on Big Sur (I haven't upgraded yet).
 2. The Idle Champions app can't be moved from it's default screen and location.
 2. Idler is a hack project that has been cobbled together piecemeal in my spare time.  Please don't judge my programming based on this :-)
