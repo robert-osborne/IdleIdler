@@ -1725,6 +1725,7 @@ if __name__ == "__main__":
         level_images = load_level_images()
         need_havi_ult = True
         need_recharge = True
+        need_leveling = not config.getboolean("idler", "familiar_leveling")
         have_leveled = config.getboolean("idler", "modron_specialization")
         log_restarted = False
         log_initial = True
@@ -1773,9 +1774,10 @@ if __name__ == "__main__":
                     print("Error restarting... wait and try again %s" % str(e))
                     time.sleep(10.0)
 
-            elif level == 1 and not config.getboolean("idler", "familiar_leveling"):
+            elif level == 1 and need_leveling:
                 # Manual leveling
                 level_team_with_keys(args, speed_team, between_champs=DEFAULT_DELAY)
+                need_leveling = False
                 need_recharge = True
             elif level < 20 and need_havi_ult:
                 need_recharge = True
