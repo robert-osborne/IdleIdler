@@ -1003,6 +1003,7 @@ TEAM_DEFINITIONS = {
     "viper":   {"key": "f7",  "bs": 12, "as": 30, "spec": "2_of_2", },
     "binwin":  {"key": "f3",  "bs": 21, "as": 30, "spec": "2_of_2", },
     "drizzt":  {"key": "f9",  "bs": 19, "as": 30, "spec": "1_of_2", },
+    "omin":    {"key": "f3",  "bs": 20, "as": 70, "spec": "2_of_3", },
 
     # fix
     "minsc":   {"key": "f7",  "bs": 4,  "as": 30, "spec": "2_of_2", },
@@ -1725,9 +1726,8 @@ if __name__ == "__main__":
         level_images = load_level_images()
         need_havi_ult = True
         need_recharge = True
-        need_leveling = not config.getboolean("idler", "familiar_leveling")
-        have_leveled = config.getboolean("idler", "modron_specialization")
         log_restarted = False
+        need_leveling = not config.getboolean("idler", "familiar_leveling")
         log_initial = True
         last_level = -1
         last_level_time = datetime.datetime.now()
