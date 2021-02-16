@@ -36,8 +36,12 @@ This all runs within the Mac OS X terminal application:
 
         ./idler.py stats
     
-1. Start up Steam and Idle Champions.  If you want to gem farm, do NOT move these applications from their default startup locations (especially Idle Champions).
-1. Run the init command to get the initial offsets saved.
+1. Start up Steam and [create a desktop shortcut](documentation/AddDesktopShortcut.png) for Idle Champions.  If you want to use this short cut outside of ./idler.py, you may need to repair it:
+
+        ./idler.py repair_shortcut
+        
+1. Start up Idle Champions. If you want to gem farm, do NOT move the application from it's default startup location.
+1. Run the init command and follow the instructions.
 
         ./idler.py init
 
@@ -95,12 +99,19 @@ No Modro core (4 or 6 familiars recommended, 2 minimum):
 
         cp sample_config_no_modron.cfg local.cfg
         
-
 ### 4. Update local.cfg using the rest of these instructions
 
+### 5. Configure your highest click level or "click wall"
+
+Let your speed team run until it slows down because the click damage is no longer instantly killing the spawning monsters.  That is your click wall.  Pick the largest number that ends with a 30 or 80, that is your click target (you get more BPH by running to one of those levels)
+
+        [idler]
+        # set modron automation [Set Goal Area] to 336
+        modron_target = 326
+        
 ### 5. Choose Reset Charge vs. Wait Recharge
 
-Reset Charge gives better BPH but is more unreliable and requires finicky Steam app setup.  Wait Recharge is more reliable but the app spends a few minutes at the end of each cycle to recharge Briv.
+Reset Charge gives better BPH but is slightly more unreliable.  Wait Recharge is more reliable but the app spends a few extra minutes at the end of each cycle to recharge Briv.
 
         [idler]
         briv_restart_charging = yes
@@ -110,17 +121,10 @@ or
 
         [idler]
         briv_restart_charging = no
+        # Charge time is dependent upon click wall
         briv_charge_time = 150.0
 
-### 6. Configure your highest click level or "click wall"
-
-Let your speed time run until it slows down because the click damage is no longer instantly killing the spawning monsters.  That is your click wall.  Pick the largest number that ends with a 30 or 80, that is your click target (you get more BPH by running to one of those levels)
-
-        [idler]
-        # set modron automation [Set Goal Area] to 336
-        modron_target = 326
-        
-### 7. Pick your speed team
+### 7. Configure your speed team
 
         [idler]
         # Current list of acceptable champs:

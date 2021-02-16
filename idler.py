@@ -15,6 +15,7 @@ import distutils
 import json
 import math
 import glob
+import shutil
 
 import pyautogui
 import pygetwindow as gw
@@ -192,6 +193,35 @@ def check_for_menu():
     if safe_image_compare(im1, menu_grey):
         return True, False
     return False, False
+
+
+def hunt_for_menu():
+    pos = pyautogui.position()
+    print("pos=%s" % str(pos))
+    # x, y = location_for_screenshot(pos.x, pos.y)
+    print("x,y=%d,%d" % (pos.x, pos.y))
+    print("Config top_x,top_y = %d,%d" % (top_x, top_y))
+    off_x, off_y = 20, 20
+    image_size = 30
+    region = (screen_scale * (pos.x - off_x), screen_scale * (pos.y - off_y),
+              screen_scale * (30+off_x), screen_scale * (30+off_y))
+    print("region=%s" % str(region))
+    im1 = pyautogui.screenshot(region=region)
+    im1.save("testmenu.png")
+    im1 = im1.convert('RGB')
+    for i in range(0,off_x*2):
+        for j in range(0,off_y*2):
+            im2 = im1.crop((i, j, i+30, j+30))
+            if safe_image_compare(im2, menu_blue):
+                im2.save("testfoundmenu.png")
+                print("found  i,j=%d,%d" % (i, j))
+                # adjust for actual center of the image
+                x, y = (pos.x-off_x)*2 + i + image_size/2, (pos.y-off_y)*2 + j + image_size/2
+                print("center x,y=%d,%d" % (x, y))
+                x, y = int(x/screen_scale) - 31 - 8, int(y/screen_scale) - 75 - 5
+                print("Guess: x,y=%d,%d == top_x,top_y=%d,%d " % (x, y, top_x, top_y))
+                return x, y, True
+    return 0, 0, False
 
 
 def activate_app(app_name, tries=2):
@@ -394,6 +424,34 @@ def load_player_json():
     return player_info
 
 
+# repair a broken desktop shortcut
+def repair_shortcut():
+    # short cut destination
+    idle_path = os.path.join(Path.home(), config.get("idler", "steam_app_path"))
+    if not os.path.isdir(idle_path):
+        print("ERROR: app path is incorrect: %s", idle_path)
+        print("ERROR: check that Idle Champions is installed")
+        return False
+
+    short_cut = os.path.join(Path.home(), config.get("idler", "shortcut_path"))
+    if not os.path.isdir(short_cut):
+        print("ERROR: short cut path is missing: %s", short_cut)
+        print("ERROR: create the Idle Champions shortcut in Steam")
+        return False
+
+    # cp .icns file
+    icns_source = os.path.join(idle_path, config.get("idler", "steam_icns"))
+    icns_dest = os.path.join(short_cut, config.get("idler", "shortcut_icns"))
+    verbose_print("copying %s to %s" % (icns_source, icns_dest))
+    shutil.copy(icns_source, icns_dest)
+
+    # cp info.plst
+    info_source = "./documentation/Info.plist"
+    info_dest = os.path.join(short_cut, "Contents/Info.plist")
+    verbose_print("copying %s to %s" % (info_source, info_dest))
+    shutil.copy(info_source, info_dest)
+
+
 def dump_stats(args, player_stats):
     # print(json.dumps(player_stats[0], indent=4, sort_keys=True))
     # return
@@ -589,15 +647,21 @@ def startup_idle_champions():
     # Bring up steam
     print("Restarting Idle Champions")
 
-    verbose_print("Looking for the steam app")
-    # move mouse to top corner
-    steam = activate_app("Steam")
-    # click [Play] or [Stop]
-    verbose_print("Clicking Play/Stop")
-    # NOTE: start_with_image is more finicky that start with x,y
-    if config.getboolean("steam", "start_with_image"):
-        click_image("steam_play.png")
-    else:
+    if config.getboolean("idler", "shortcut_restarting"):
+        verbose_print("Starting app with shortcut")
+        try:
+            short_cut = os.path.join(Path.home(), config.get("idler", "shortcut_path"))
+            if not os.path.exists(short_cut):
+                print("ERROR: create a %s desktop short cut using Steam" % short_cut)
+                sys.exit(1)
+            result = os.system("open '%s'" % short_cut)
+            verbose_print("open shortcut_path (%s) returns %s" % (short_cut, str(result)))
+        except Exception as e:
+            print("ERROR: could not launch %s" % short_cut)
+            print("ERROR: %s" % str(e))
+            sys.exit(1)
+
+    elif config.getboolean("idler", "shortcut_start_xy"):
         # TODO: fall back to click_image if this fails
         x = config.getint("steam", "start_x")
         y = config.getint("steam", "start_y")
@@ -605,11 +669,21 @@ def startup_idle_champions():
         time.sleep(0.1)
         pyautogui.click()
         time.sleep(1.0)
+    else:
+        verbose_print("Looking for the steam app")
+        # move mouse to top corner
+        steam = activate_app("Steam")
+        # click [Play] or [Stop]
+        verbose_print("Clicking Play/Stop")
+        # NOTE: start_with_image is more finicky that start with x,y
+        if config.getboolean("steam", "start_with_image"):
+            click_image("steam_play.png")
 
     # now restore the app to front
     print("Waiting for Idle to launch.")
     found_app = False
-    for s in range(20, 0, -1):
+    ignore_errors = 20
+    for s in range(40, 0, -1):
         verbose_print("  %d seconds" % (s/2))
         time.sleep(0.5)
 
@@ -621,9 +695,15 @@ def startup_idle_champions():
                     found_app = activate_app(APP_NAME)
             raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
         except gw.PyGetWindowException as a:
-            print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            if s <= ignore_errors:
+                print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            else:
+                verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
         except Exception as a:
-            print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            if s <= ignore_errors:
+                print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            else:
+                verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
 
         if found_app:
             break
@@ -718,9 +798,11 @@ def foreground_or_start():
                 break
             raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
     except gw.PyGetWindowException as a:
-        print("App not found, starting now %s: %s" % (datetime.datetime.now(), a))
+        print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
+        verbose_print("WARNING: %s" % (a,))
     except Exception as a:
-        print("App not found, starting now %s: %s" % (datetime.datetime.now(), a))
+        print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
+        verbose_print("WARNING: %s" % (a,))
 
     if not activated:
         startup_idle_champions()
@@ -859,6 +941,8 @@ def charge_briv(level, plus, images, args):
     time.sleep(0.5)
     pyautogui.press("g")
     time.sleep(0.5)
+
+    print("Recharging Briv starting at %s" % (datetime.datetime.now()))
 
     # make sure we are not on a boss or zone without a spinner
     while True:
@@ -1407,40 +1491,48 @@ if __name__ == "__main__":
             init_config.read(init_config_path)
         else:
             print("Creating ~/.idler file")
-        print("Looking for the steam app")
-        # move mouse to top corner
-        steam = activate_app("Steam")
-        time.sleep(1)
-        # click [Play] or [Stop]
-        print("Looking for Play or Stop")
-        try:
-            location = locate("steam_play.png", "steam_stop.png")
-            if "steam" not in init_config:
-                init_config.add_section("steam")
-            init_config["steam"]["; middle pixel of the Idle Champions [play] button on Steam"] = None
-            init_config["steam"]["start_with_image"] = "no"
-            init_config["steam"]["start_x"] = str(int(location.x))
-            init_config["steam"]["start_y"] = str(int(location.y))
-            print("Found Steam Play/Stop Location: %s" % str(location))
-        except Exception as e:
-            print("Error finding Steam Play/Stop location: %s" % str(e))
+        if not config.getboolean("idler", "shortcut_restarting"):
+            print("Looking for the steam app")
+            # move mouse to top corner
+            steam = activate_app("Steam")
+            time.sleep(1)
+            # click [Play] or [Stop]
+            print("Looking for Play or Stop")
+            try:
+                location = locate("steam_play.png", "steam_stop.png")
+                if "steam" not in init_config:
+                    init_config.add_section("steam")
+                init_config["steam"]["; middle pixel of the Idle Champions [play] button on Steam"] = None
+                init_config["steam"]["start_with_image"] = "no"
+                init_config["steam"]["start_x"] = str(int(location.x))
+                init_config["steam"]["start_y"] = str(int(location.y))
+                print("Found Steam Play/Stop Location: %s" % str(location))
+            except Exception as e:
+                print("Error finding Steam Play/Stop location: %s" % str(e))
 
+        print("Hover over the blue menu icon in the top left corner of the Idle Champions game.  Do not click!")
+        time.sleep(5.0)
         print("Looking for the %s app" % APP_NAME)
-        time.sleep(1)
         ic_app = activate_app(APP_NAME)
         time.sleep(1)
-        try:
-            location = locate("menu.png")
-            top_x, top_y = top_location_from_menu(int(location.x), int(location.y))
-            if "idler" not in init_config:
-                init_config.add_section("idler")
-            init_config["idler"]["; top left pixel of the app when launched"] = None
-            init_config["idler"]["use_top_hint"] = "yes"
-            init_config["idler"]["top_hint_x"] = str(top_x)
-            init_config["idler"]["top_hint_y"] = str(top_y)
-            print("Found Menu Icon location: %s" % str(location))
-        except Exception as e:
-            print("Error finding Menu Icon location: %s" % str(e))
+        for tries in range(0, 2):
+            try:
+                # location = locate("menu.png")
+                # top_x, top_y = top_location_from_menu(int(location.x), int(location.y))
+                print("Screen shot in ", end='')
+                for i in range(10,0,-1):
+                    print('%d ...' % i, end='', flush=True)
+                    time.sleep(1)
+                top_x, top_y, found = hunt_for_menu()
+                if "idler" not in init_config:
+                    init_config.add_section("idler")
+                init_config["idler"]["; top left pixel of the app when launched"] = None
+                init_config["idler"]["use_top_hint"] = "yes"
+                init_config["idler"]["top_hint_x"] = str(top_x)
+                init_config["idler"]["top_hint_y"] = str(top_y)
+                print("Found app top x,y: %d,%d" % str(top_x, top_y))
+            except Exception as e:
+                print("Error finding Menu Icon location: %s" % str(e))
 
         print("Checking init with current zone ...")
         level_images = load_level_images()
@@ -1448,13 +1540,37 @@ if __name__ == "__main__":
         if level > 0:
             print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
         else:
-            print("Zone not found, check again with .idler.py zone")
+            print("Zone not found, check again with ./idler.py zone")
 
         print("Updating ~/.idler.py")
         with open(init_config_path, 'w') as f:
             f.write("# created by idler.py, a Idle Champions script engine\n")
             f.write("# Warning: edit at on risk\n")
             init_config.write(f)
+        sys.exit(0)
+
+    if args.command == "testhunt":
+        level_images = load_level_images()
+        print("Test Hunt for Menu ...")
+        print("Screen shot in ", end='')
+        for i in range(10,0,-1):
+            print('%d ...' % i, end='', flush=True)
+            time.sleep(1)
+        for round in range(0,5):
+            print("")
+            print("######## Round %d ############" % round)
+            x, y, found = hunt_for_menu()
+            if found:
+                top_x = x
+                top_y = y
+                level, plus = get_current_zone(level_images=level_images, save=True, tries=1)
+                print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+            if round == 4:
+                break
+            print("Next screen shot in ", end='')
+            for i in range(5,0,-1):
+                print('%d ...' % i, end='', flush=True)
+                time.sleep(1)
         sys.exit(0)
 
     if args.command == "mouse":
@@ -1564,6 +1680,10 @@ if __name__ == "__main__":
         else:
             print("Same")
         sys.exit(1)
+
+    if args.command == "repair_shortcut":
+        result = repair_shortcut()
+        sys.exit(0 if result else 1)
 
     # Commands above this line don't require Idle Champions to be running
     # ########################################################################
@@ -1812,7 +1932,7 @@ if __name__ == "__main__":
                     charge_briv(level, plus, level_images, args)
                     last_level = -1
                     last_level_time = datetime.datetime.now()
-                    print("Recharge finished: %s" % last_level_time)
+                    verbose_print("Recharge finished: %s" % last_level_time)
                     need_recharge = False
                 need_havi_ult = True
                 time.sleep(1.0)
@@ -1963,7 +2083,6 @@ if __name__ == "__main__":
                     time.sleep(10)
                     level, plus = get_current_zone(level_images, args.save_mismatch)
                     if level >= args.target:
-                        print("Recharging Briv starting at %s" % (datetime.datetime.now()))
                         charge_briv(level, plus, level_images, args)
                         break
                 except Exception as a:
