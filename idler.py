@@ -216,7 +216,7 @@ def hunt_for_menu():
                 im2.save("testfoundmenu.png")
                 print("found  i,j=%d,%d" % (i, j))
                 # adjust for actual center of the image
-                x, y = (pos.x-off_x)*2 + i + image_size/2, (pos.y-off_y)*2 + j + image_size/2
+                x, y = int((pos.x-off_x)*2 + i + image_size/2), int((pos.y-off_y)*2 + j + image_size/2)
                 print("center x,y=%d,%d" % (x, y))
                 x, y = int(x/screen_scale) - 31 - 8, int(y/screen_scale) - 75 - 5
                 print("Guess: x,y=%d,%d == top_x,top_y=%d,%d " % (x, y, top_x, top_y))
