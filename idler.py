@@ -1864,10 +1864,10 @@ def main_method():
         sys.exit(0)
 
     if args.command == "modron":
-        try:
-            verified = verify_menu(update=False)
-        except Exception:
-            print("ERROR: Can't verify menu location. Exiting.")
+        # try:
+        #     verified = verify_menu(update=False)
+        # except Exception:
+        #     print("ERROR: Can't verify menu location. Exiting.")
         print("Modron Gem Farming: Briv charge zone=%d; modron zone=%d; charge=%f seconds; havi ult=%s; hew ult=%s" % (
             args.target-10,
             args.target,
