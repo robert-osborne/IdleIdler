@@ -1306,7 +1306,7 @@ epilog="""Commands:
 
 
 def main_method():
-    global top_x, top_y
+    global top_x, top_y, verbose
     load_config()
 
     # get defaults from config file
