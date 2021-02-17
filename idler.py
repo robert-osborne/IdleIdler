@@ -1970,6 +1970,11 @@ def main_method():
     OFFSET_xx3 = 2025 - OFFSET_xx1
     OFFSET_xx4 = 2122 - OFFSET_xx1
     if args.command == "grab":
+        region = get_level_region()
+        raw_im = pyautogui.screenshot(region=region)
+        im = raw_im.convert('RGB')
+        im.save("1xx.png")
+        sys.exit(0)
         x, y = menu_location()
         pyautogui.moveTo(x, y)
         x, y = location_for_screenshot(440, 240)
