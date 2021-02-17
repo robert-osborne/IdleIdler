@@ -195,32 +195,55 @@ def check_for_menu():
     return False, False
 
 
-def hunt_for_menu():
+def hunt_for_menu(level_images):
+    global top_x, top_y
     pos = pyautogui.position()
-    print("pos=%s" % str(pos))
+    verbose_print("pos=%s" % str(pos))
     # x, y = location_for_screenshot(pos.x, pos.y)
-    print("x,y=%d,%d" % (pos.x, pos.y))
-    print("Config top_x,top_y = %d,%d" % (top_x, top_y))
+    verbose_print("x,y=%d,%d" % (pos.x, pos.y))
+    verbose_print("Configured top_x,top_y = %d,%d" % (top_x, top_y))
     off_x, off_y = 20, 20
     image_size = 30
     region = (screen_scale * (pos.x - off_x), screen_scale * (pos.y - off_y),
               screen_scale * (30+off_x), screen_scale * (30+off_y))
-    print("region=%s" % str(region))
+    verbose_print("region=%s" % str(region))
     im1 = pyautogui.screenshot(region=region)
-    im1.save("testmenu.png")
+    if verbose:
+        im1.save("testmenu.png")
     im1 = im1.convert('RGB')
+    found_x = 0
+    found_y = 0
     for i in range(0,off_x*2):
         for j in range(0,off_y*2):
             im2 = im1.crop((i, j, i+30, j+30))
             if safe_image_compare(im2, menu_blue):
-                im2.save("testfoundmenu.png")
-                print("found  i,j=%d,%d" % (i, j))
+                if verbose:
+                    im2.save("testfoundmenu.png")
+                verbose_print("found  i,j=%d,%d" % (i, j))
                 # adjust for actual center of the image
-                x, y = int((pos.x-off_x)*2 + i + image_size/2), int((pos.y-off_y)*2 + j + image_size/2)
-                print("center x,y=%d,%d" % (x, y))
-                x, y = int(x/screen_scale) - 31 - 8, int(y/screen_scale) - 75 - 5
-                print("Guess: x,y=%d,%d == top_x,top_y=%d,%d " % (x, y, top_x, top_y))
-                return x, y, True
+                x, y = (pos.x-off_x)*2 + i + image_size/2, (pos.y-off_y)*2 + j + image_size/2
+                verbose_print("center x,y=%f,%f" % (x, y))
+                x, y = x/screen_scale - 31 - 8, y/screen_scale - 75 - 5
+                x = int(x)
+                y = int(y)
+                verbose_print("Guess: x,y=%f,%f == top_x,top_y=%d,%d " % (x, y, top_x, top_y))
+                found_x = x
+                found_y = y
+                break
+        if found_x:
+            break
+    if not found_x:
+        return 0, 0, False
+    # Jitter
+    for x_jitter in range(-1, 2, 1):
+        for y_jitter in range(-1, 2, 1):
+            top_x = found_x + x_jitter
+            top_y = found_y + y_jitter
+            verbose_print("trying jitter %d,%d => %d,%d" % (x_jitter, y_jitter, top_x, top_y))
+            level, plus = get_current_zone(level_images=level_images, save=True, tries=1)
+            if level > 0:
+                print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+                return top_x, top_y, True
     return 0, 0, False
 
 
@@ -250,10 +273,13 @@ def load_level_images():
         images[f] = Image.open(f).convert('RGB').crop((0,0,60,56))
     return images
 
+
 OFFSET_xx1 = 1829
 OFFSET_Y = 14
 IMAGE_WIDTH = 60
 IMAGE_HEIGHT = 56
+
+
 # TODO: LEGACY set top_x and top_x by finding menu
 def get_menu(tries=10, update=False):
     for i in range(0,tries):
@@ -268,8 +294,8 @@ def get_menu(tries=10, update=False):
 
 
 # TODO: make this work
-# menu_blue_nr = Image.open("menu_blue_nr.png")
 def verify_menu(tries=10, update=False):
+    menu_blue_nr = Image.open("menu_blue_nr.png")
     verbose_print("Verifying menu ...")
     for i in range(0,tries):
         # First check using existing top_x, top_y (if exists)
@@ -287,7 +313,7 @@ def verify_menu(tries=10, update=False):
                 #
                 # found ... all good!
                 if menu_home:
-                    print("menu_home=%s x,y=%d,%d" % (menu_home, x, y))
+                    print("menu_home=%s x,y=%d,%d" % (menu_home, menu_home.x, menu_home.y))
                 verbose_print("Verifying menu: locateAll with Image")
                 positions = pyautogui.locateAllOnScreen(menu_blue_nr)
                 if positions:
@@ -331,7 +357,7 @@ LEVEL_TRYS=20
 def get_current_zone(level_images, save=False, tries=LEVEL_TRYS):
     im = None
     for i in range(0,tries):
-        verbose_print("get_urrent_zone attempt %d" % i)
+        verbose_print("get_current_zone attempt %d" % i)
         region = get_level_region()
         raw_im = pyautogui.screenshot(region=region)
         im = raw_im.convert('RGB')
@@ -933,7 +959,7 @@ def restart_stacking(args):
 def charge_briv(level, plus, images, args):
     screenshare = args.screenshare
     charge_time = args.charge
-    briv_target = args.target
+    briv_target = args.target - 10
     restart = args.restart
 
     GO_BACK_DELAY=9
@@ -1223,8 +1249,8 @@ def get_bool_config(cfg, key, default):
 
 
 def add_champs_to_parser(parser):
-    for k,v in TEAM_DEFINITIONS:
-        lc = k.lower()
+    for name, v in TEAM_DEFINITIONS:
+        lc = name.lower()
         parser.add_argument("--"+lc, help="Use "+name,
                             default=False,
                             dest="use_"+lc,
@@ -1278,23 +1304,27 @@ epilog="""Commands:
         ./idler.py --charge 15 stack 5
 """
 
-if __name__ == "__main__":
+
+def main_method():
+    global top_x, top_y
     load_config()
 
     # get defaults from config file
-    have_briv = get_bool_config(config, "use_briv", have_briv)
-    have_havilar = get_bool_config(config, "use_havilar", have_havilar)
-    have_binwin = get_bool_config(config, "use_binwin", have_binwin)
-    have_deekin = get_bool_config(config, "use_deekin", have_deekin)
-    have_sentry = get_bool_config(config, "use_sentry", have_sentry)
-    have_shandie = get_bool_config(config, "use_shandie", have_shandie)
-    have_melf = get_bool_config(config, "use_melf", have_melf)
-    have_hew = get_bool_config(config, "use_hew", have_melf)
+    # have_briv = get_bool_config(config, "use_briv", have_briv)
+    # have_havilar = get_bool_config(config, "use_havilar", have_havilar)
+    # have_binwin = get_bool_config(config, "use_binwin", have_binwin)
+    # have_deekin = get_bool_config(config, "use_deekin", have_deekin)
+    # have_sentry = get_bool_config(config, "use_sentry", have_sentry)
+    # have_shandie = get_bool_config(config, "use_shandie", have_shandie)
+    # have_melf = get_bool_config(config, "use_melf", have_melf)
+    # have_hew = get_bool_config(config, "use_hew", have_melf)
 
     steam_start_with_image = get_bool_config(config, "steam_start_with_image", True)
     steam_start_x = get_bool_config(config, "steam_start_x", True)
     default_charge_time = config.getfloat("idler", "briv_charge_time")
     briv_restart_charging = config.getboolean("idler", "briv_restart_charging")
+
+    level_images = load_level_images()
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1315,7 +1345,7 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--familiars", default=NUM_FAMILIARS,
                         help="How many familiars do you have (default %d)" % NUM_FAMILIARS, type=int)
     parser.add_argument("--target", default=config.getint("idler", "modron_target"),
-                        help="When to start checking for Briv charging (default %d)" % config.getint("idler", "modron_target"),
+                        help="What zone is your Modron core set to restart (default %d)" % config.getint("idler", "modron_target"),
                         type=float)
     parser.add_argument("--charge", default=default_charge_time,
                         help="Amount of time for Briv charging, either method (default %f)" % default_charge_time,
@@ -1523,19 +1553,21 @@ if __name__ == "__main__":
                 for i in range(10,0,-1):
                     print('%d ...' % i, end='', flush=True)
                     time.sleep(1)
-                top_x, top_y, found = hunt_for_menu()
+                top_x, top_y, found = hunt_for_menu(level_images)
+                if not found:
+                    continue
                 if "idler" not in init_config:
                     init_config.add_section("idler")
                 init_config["idler"]["; top left pixel of the app when launched"] = None
                 init_config["idler"]["use_top_hint"] = "yes"
                 init_config["idler"]["top_hint_x"] = str(top_x)
                 init_config["idler"]["top_hint_y"] = str(top_y)
-                print("Found app top x,y: %d,%d" % str(top_x, top_y))
+                print("Found app top x,y: %d,%d" % (top_x, top_y))
+                break
             except Exception as e:
                 print("Error finding Menu Icon location: %s" % str(e))
 
         print("Checking init with current zone ...")
-        level_images = load_level_images()
         level, plus = get_current_zone(level_images=level_images, save=True, tries=1)
         if level > 0:
             print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
@@ -1550,7 +1582,6 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args.command == "testhunt":
-        level_images = load_level_images()
         print("Test Hunt for Menu ...")
         print("Screen shot in ", end='')
         for i in range(10,0,-1):
@@ -1559,12 +1590,7 @@ if __name__ == "__main__":
         for round in range(0,5):
             print("")
             print("######## Round %d ############" % round)
-            x, y, found = hunt_for_menu()
-            if found:
-                top_x = x
-                top_y = y
-                level, plus = get_current_zone(level_images=level_images, save=True, tries=1)
-                print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+            x, y, found = hunt_for_menu(level_images)
             if round == 4:
                 break
             print("Next screen shot in ", end='')
@@ -1587,7 +1613,6 @@ if __name__ == "__main__":
         time.sleep(1)
         ic_app = activate_app(APP_NAME)
         time.sleep(1)
-        level_images = load_level_images()
         level, plus = get_current_zone(level_images, True)
         print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
         if level <= 0:
@@ -1690,10 +1715,12 @@ if __name__ == "__main__":
     # Start idle champions and foreground it
 
     print("Starting/Foregrounding Idle Champions")
-    print("Script will start in ...")
-    for s in range(args.countdown, 0, -1):
-        print("  %d seconds" % s)
-        time.sleep(1.0)
+    if args.countdown > 0:
+        print("Script will start in ...", end='', flush=True)
+        for s in range(args.countdown, 0, -1):
+            print(" %d ..." % s, end='', flush=True)
+            time.sleep(1.0)
+        print("now")
 
     foreground_or_start()
     time.sleep(1.0)
@@ -1797,7 +1824,6 @@ if __name__ == "__main__":
                 sys.exit(1)
 
     while args.command == "testimages":
-        level_images = load_level_images()
         level, plus = get_current_zone(level_images, args.save_mismatch)
         if level > 0:
             print("zone found %d, %s, %s" % (level, plus, on_boss()))
@@ -1821,14 +1847,18 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if args.command == "testzone":
-        level_images = load_level_images()
+        print("Testing zone detection")
+        level, plus = get_current_zone(level_images, True, tries=3)
+        if level <= 0:
+            sys.exit("Cound not find zone, saved in my_screenshot*.png")
+        print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+        sys.exit(0)
+
+    if args.command == "legacyzone":
+        print("Legacy zone detection")
         x, y = get_menu(tries=10)
         region = get_level_region()
         print("%d, %d vs %s" % (x, y, region))
-        level, plus = get_current_zone(level_images, True)
-        if level <= 0:
-            sys.exit("Cound not find zone, saved in my_screenshot*.png")
-        print("new %s, %s" % (level, plus))
         level, plus = get_current_level(x, y, level_images, args.save_mismatch)
         print("old %s, %s" % (level, plus))
         sys.exit(0)
@@ -1838,12 +1868,11 @@ if __name__ == "__main__":
             verified = verify_menu(update=False)
         except Exception:
             print("ERROR: Can't verify menu location. Exiting.")
-        print("Modron Gem Farming: charge zone=%d modron zone=%d charge=%f havi ult=%s hew ult=%s" % (
+        print("Modron Gem Farming: Briv charge zone=%d; modron zone=%d; charge=%f seconds; havi ult=%s; hew ult=%s" % (
+            args.target-10,
             args.target,
-            args.target+10,
             args.charge, args.havi_ult, args.hew_ult))
         print("(Hit CTRL-C to stop or move mouse to the corner of the screen)")
-        level_images = load_level_images()
         need_havi_ult = True
         need_recharge = True
         log_restarted = False
@@ -1920,10 +1949,10 @@ if __name__ == "__main__":
                     time.sleep(120.0)
                 foreground_or_start()
             elif level < args.target - 40:
-                time.sleep(10.0)
+                time.sleep(5.0)
                 accept_screen_share(args.screenshare)
                 foreground_or_start()
-            elif level < args.target:
+            elif level < args.target - 10:
                 time.sleep(0.1)
                 continue
             else:
@@ -1975,7 +2004,6 @@ if __name__ == "__main__":
 
     while args.command == "monitor":
         time.sleep(1.0)
-        level_images = load_level_images()
         menu_home = locate('menu.png')
         print("menu_home.x = %f menu_home.y = %f" % (menu_home.x, menu_home.y))
         x = menu_home.x * 2 + 1830
@@ -2033,7 +2061,6 @@ if __name__ == "__main__":
     do_startup = True
     if args.in_progress:
         do_startup = False
-    level_images = load_level_images()
     wait_minutes = 10 if args.loops == 0 else args.loops
     while args.command in no_modron_commands:
         loop_time = datetime.datetime.now()
@@ -2110,3 +2137,6 @@ if __name__ == "__main__":
 
     # print("%s" % list(pyautogui.locateAllOnScreen('./burger2.png')))
 
+
+if __name__ == "__main__":
+    main_method()

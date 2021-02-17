@@ -106,8 +106,8 @@ No Modro core (4 or 6 familiars recommended, 2 minimum):
 Let your speed team run until it slows down because the click damage is no longer instantly killing the spawning monsters.  That is your click wall.  Pick the largest number that ends with a 30 or 80, that is your click target (you get more BPH by running to one of those levels)
 
         [idler]
-        # set modron automation [Set Goal Area] to 336
-        modron_target = 326
+        # set modron automation [Set Goal Area] to 330
+        modron_target = 330
         
 ### 5. Choose Reset Charge vs. Wait Recharge
 
