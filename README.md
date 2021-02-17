@@ -133,6 +133,10 @@ or
         speed_team = shandie,briv,drizzt,sentry,havi,deekin,hew,melf,binwin
         hew_ult=6
         havi_ult=8
+        
+### 8. Gem Farm
+
+        ./idler.py modron
 
 ## Advanced Topics
 
