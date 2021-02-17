@@ -1940,7 +1940,7 @@ def main_method():
                         pyautogui.press(args.havi_ult)
                         time.sleep(0.3)
                 time.sleep(1.0)
-            elif level < args.target - 100:
+            elif level < args.target - 150:
                 if args.screenshare:
                     accept_screen_share(args.screenshare)
                     foreground_or_start()
@@ -1948,7 +1948,7 @@ def main_method():
                 else:
                     time.sleep(120.0)
                 foreground_or_start()
-            elif level < args.target - 40:
+            elif level < args.target - 50:
                 time.sleep(5.0)
                 accept_screen_share(args.screenshare)
                 foreground_or_start()
@@ -1977,6 +1977,7 @@ def main_method():
         im = pyautogui.screenshot(region=region)
         im.save("inventory.png")
         sys.exit(0)
+        level, plus = get_current_zone(level_images, args.save_mismatch)
         # x, y = get_menu()
         print("x = %f y = %f" % (x, y))
         # x01
