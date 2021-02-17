@@ -1883,6 +1883,7 @@ def main_method():
         while True:
             try:
                 level, plus = get_current_zone(level_images, args.save_mismatch)
+                verbose_print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
             except Exception as e:
                 print("Error getting current level: %s" % str(e))
                 level = -2
