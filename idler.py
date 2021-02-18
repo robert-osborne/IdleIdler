@@ -247,7 +247,7 @@ def hunt_for_menu(level_images):
     return 0, 0, False
 
 
-def activate_app(app_name, tries=2):
+def activate_app(app_name, tries=2, reset_top=False):
     for c in range(0,tries):
         try:
             window = gw.getWindowsWithTitle(app_name)[0]
@@ -255,6 +255,10 @@ def activate_app(app_name, tries=2):
             time.sleep(0.2)
             active = gw.getActiveWindow()
             if active.title == app_name:
+                if reset_top:
+                    global top_x, top_y
+                    top_x, top_y = active.left+1, active.top+24
+                    verbose_print("Updating top_x, top_y = %d,%d" % (top_x, top_y))
                 return active
             if active.title == "":
                 # active menu is a pull down or some crap ... move to a neutral corner
@@ -718,7 +722,7 @@ def startup_idle_champions():
             windows = gw.getWindowsWithTitle(APP_NAME)
             for window in windows:
                 if window.title == APP_NAME:
-                    found_app = activate_app(APP_NAME)
+                    found_app = activate_app(APP_NAME, reset_top=True)
             raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
         except gw.PyGetWindowException as a:
             if s <= ignore_errors:
@@ -733,6 +737,7 @@ def startup_idle_champions():
 
         if found_app:
             break
+
 
     # click ok or find menu for 20 seconds
     if click_ok(startup=True, count=20, ic_app=found_app):
@@ -1611,7 +1616,7 @@ def main_method():
     if args.command == "zone":
         print("Looking for the %s app" % APP_NAME)
         time.sleep(1)
-        ic_app = activate_app(APP_NAME)
+        found_app = activate_app(APP_NAME, reset_top=True)
         time.sleep(1)
         level, plus = get_current_zone(level_images, True)
         print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
@@ -1848,6 +1853,12 @@ def main_method():
 
     if args.command == "testzone":
         print("Testing zone detection")
+        found_app = activate_app(APP_NAME)
+        print("%d,%d" % (found_app.left, found_app.top))
+        print("Configured top_x,top_y = %d,%d" % (top_x, top_y))
+        top_x, top_y = found_app.left+1, found_app.top+24
+        print("new top_x,top_y = %d,%d" % (top_x, top_y))
+
         level, plus = get_current_zone(level_images, True, tries=3)
         if level <= 0:
             sys.exit("Cound not find zone, saved in my_screenshot*.png")
@@ -2038,6 +2049,15 @@ def main_method():
             im.save('my_screenshot%d.png' % i)
             
         break
+
+    if args.command == "move":
+        x = args.loops
+        y = args.extras[0]
+        found_app = activate_app(APP_NAME)
+        rect = found_app._rect
+        print("app=%s" % str(found_app))
+        sys.exit(0)
+        # click_second_spec(delay=1.0)
 
     while args.command == "press":
         keys = ["q", "w", "e"]
