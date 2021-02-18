@@ -32,6 +32,7 @@ config = configparser.ConfigParser()
 top_x = 0
 top_y = 0
 screen_scale = 2
+infinite_loop = False
 
 # Usually 376, 426, etc. and set restart on 386, 436, ...
 CHARGE_TIME = 60.0 * 2.5
@@ -256,8 +257,8 @@ def activate_app(app_name, tries=2, reset_top=False):
             active = gw.getActiveWindow()
             if active.title == app_name:
                 if reset_top:
-                    global top_x, top_y
-                    top_x, top_y = active.left+1, active.top+24
+                    global top_x, top_y, top_offset
+                    top_x, top_y = active.left+1, active.top+top_offset
                     verbose_print("Updating top_x, top_y = %d,%d" % (top_x, top_y))
                 return active
             if active.title == "":
@@ -1301,7 +1302,7 @@ epilog="""Commands:
 
 
 def main_method():
-    global top_x, top_y, verbose
+    global top_x, top_y, top_offset, verbose, infinite_loop
     load_config()
 
     # get defaults from config file
@@ -1405,6 +1406,9 @@ def main_method():
 
     parser.add_argument("-O", "--odds", help="Briv odds of jumping",
                         type=float, default=99.0)
+    parser.add_argument("--header", help="Height of the Idle Champions application header",
+                        type=int,
+                        default=config.getint("idler", "header_height"))
     parser.add_argument("--countdown",
                         help="Seconds to wait before starting command (default %d)" % COUNTDOWN,
                         type=int,
@@ -1445,6 +1449,7 @@ def main_method():
 
     verbose_print("Command = %s" % args.command)
 
+    top_offset = args.header
     patron = "None"
     verbose = args.verbose
 
@@ -1846,7 +1851,7 @@ def main_method():
         found_app = activate_app(APP_NAME)
         print("%d,%d" % (found_app.left, found_app.top))
         print("Configured top_x,top_y = %d,%d" % (top_x, top_y))
-        top_x, top_y = found_app.left+1, found_app.top+24
+        top_x, top_y = found_app.left+1, found_app.top+top_offset
         print("new top_x,top_y = %d,%d" % (top_x, top_y))
 
         level, plus = get_current_zone(level_images, True, tries=3)
@@ -1865,6 +1870,7 @@ def main_method():
         sys.exit(0)
 
     if args.command == "modron":
+        infinite_loop = True
         # try:
         #     verified = verify_menu(update=False)
         # except Exception:
@@ -2080,6 +2086,7 @@ def main_method():
         do_startup = False
     wait_minutes = 10 if args.loops == 0 else args.loops
     while args.command in no_modron_commands:
+        infinite_loop = True
         loop_time = datetime.datetime.now()
         menu_home = None
         ult = 0
@@ -2154,6 +2161,10 @@ def main_method():
 
     # print("%s" % list(pyautogui.locateAllOnScreen('./burger2.png')))
 
-
 if __name__ == "__main__":
-    main_method()
+    first_loop = True
+    while first_loop or infinite_loop:
+        try:
+            main_method()
+        except Exception as e:
+            print("WARNING: exception caught: %e")
