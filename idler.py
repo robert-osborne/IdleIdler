@@ -264,8 +264,12 @@ def activate_app(app_name, tries=2, reset_top=False):
                 # active menu is a pull down or some crap ... move to a neutral corner
                 pyautogui.moveTo(500,500)
             verbose_print("window title: %s try again" % gw.getActiveWindow().title)
-        except Exception as e:
-            pass
+        except gw.PyGetWindowException as a:
+            # print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
+            verbose_print("WARNING: %s: %s" % (app_name, a, ))
+        except Exception as a:
+            # print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
+            verbose_print("WARNING: %s: %s" % (app_name, a, ))
     return False
 
 
@@ -819,21 +823,7 @@ def click_ok(count=1, startup=False, ic_app=None):
 def foreground_or_start():
     # windows = gw.getAllTitles()
     # print("%s" % windows)
-    activated = False
-    try:
-        windows = gw.getWindowsWithTitle("Idle Champions")
-        for window in windows:
-            if window.title == "Idle Champions":
-                window.activate()
-                activated = True
-                break
-            raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
-    except gw.PyGetWindowException as a:
-        print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
-        verbose_print("WARNING: %s" % (a,))
-    except Exception as a:
-        print("%s not found, starting at %s" % (APP_NAME, datetime.datetime.now()))
-        verbose_print("WARNING: %s" % (a,))
+    activated = activate_app(APP_NAME, tries=1, reset_top=True)
 
     if not activated:
         startup_idle_champions()
