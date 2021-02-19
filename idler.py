@@ -790,7 +790,7 @@ def click_ok(count=1, startup=False, ic_app=None):
                 time.sleep(0.5)
             time.sleep(0.5)
 
-    sys.exit(0)
+    return False
     # give up on fast method, now go looking for okay image and reset top_x, top_y using menu image
     for s in range(count, 0, -1):
         try:
@@ -1849,6 +1849,7 @@ def main_method():
     if args.command == "testzone":
         print("Testing zone detection")
         found_app = activate_app(APP_NAME)
+        print("%s" % str(found_app))
         print("%d,%d" % (found_app.left, found_app.top))
         print("Configured top_x,top_y = %d,%d" % (top_x, top_y))
         top_x, top_y = found_app.left+1, found_app.top+top_offset
