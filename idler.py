@@ -955,7 +955,7 @@ def restart_stacking(args):
 def charge_briv(level, plus, images, args):
     screenshare = args.screenshare
     charge_time = args.charge
-    briv_target = args.target - 10
+    briv_target = args.target - args.briv_recharge_areas
     restart = args.restart
 
     GO_BACK_DELAY=9
@@ -1342,7 +1342,10 @@ def main_method():
                         help="How many familiars do you have (default %d)" % NUM_FAMILIARS, type=int)
     parser.add_argument("--target", default=config.getint("idler", "modron_target"),
                         help="What zone is your Modron core set to restart (default %d)" % config.getint("idler", "modron_target"),
-                        type=float)
+                        type=int)
+    parser.add_argument("--briv-recharge-areas", "--briv-areas", default=config.getint("idler", "briv_recharge_areas"),
+                        help="How many areas before your Modron area goal should Briv start recharging (default is %s which works for Triple Skip Briv, use 15 for Quad skip Briv)" % config.getint("idler", "briv_recharge_areas"),
+                        type=int)
     parser.add_argument("--charge", default=default_charge_time,
                         help="Amount of time for Briv charging, either method (default %f)" % default_charge_time,
                         type=float)
@@ -1876,8 +1879,8 @@ def main_method():
         #     verified = verify_menu(update=False)
         # except Exception:
         #     print("ERROR: Can't verify menu location. Exiting.")
-        print("Modron Gem Farming: Briv charge zone=%d; modron zone=%d; charge=%f seconds; havi ult=%s; hew ult=%s" % (
-            args.target-10,
+        print("Modron Gem Farming: Briv recharge area=%d; modron goal area=%d; charge=%f seconds; havi ult=%s; hew ult=%s" % (
+            args.target-args.briv_recharge_areas,
             args.target,
             args.charge, args.havi_ult, args.hew_ult))
         print("(Hit CTRL-C to stop or move mouse to the corner of the screen)")
@@ -1961,8 +1964,7 @@ def main_method():
                 time.sleep(5.0)
                 accept_screen_share(args.screenshare)
                 foreground_or_start()
-            elif level < args.target - 10:
-                time.sleep(0.1)
+            elif level < args.target - args.briv_recharge_areas:
                 continue
             else:
                 log_restarted = True
@@ -2168,4 +2170,4 @@ if __name__ == "__main__":
         try:
             main_method()
         except Exception as e:
-            print("WARNING: exception caught: %e")
+            print("WARNING: exception caught: %s" % e)
