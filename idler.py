@@ -821,10 +821,10 @@ def click_ok(count=1, startup=False, ic_app=None):
         time.sleep(.8)
 
 
-def foreground_or_start():
+def foreground_or_start(tries=2):
     # windows = gw.getAllTitles()
     # print("%s" % windows)
-    activated = activate_app(APP_NAME, tries=1, reset_top=True)
+    activated = activate_app(APP_NAME, tries=tries, reset_top=True)
 
     if not activated:
         startup_idle_champions()
@@ -1725,7 +1725,7 @@ def main_method():
             time.sleep(1.0)
         print("now")
 
-    foreground_or_start()
+    foreground_or_start(tries=5)
     time.sleep(1.0)
 
     # TODO: check that top_x and top_y have been set
@@ -1940,17 +1940,17 @@ def main_method():
                 level_team_with_keys(args, speed_team, between_champs=DEFAULT_DELAY)
                 need_leveling = False
                 need_recharge = True
-            elif level < 20 and need_havi_ult:
+            elif level < 40 and need_havi_ult:
                 need_recharge = True
                 if log_restarted:
                     log_restarted = False
                     print("Loop started %s: %d" % (datetime.datetime.now(), level))
-                if level >= 6:
+                if level >= 11:
                     need_havi_ult = False
                     print("Havi Ult")
-                    for i in range(0,10):
+                    for i in range(0,40):
                         pyautogui.press(args.havi_ult)
-                        time.sleep(0.3)
+                        time.sleep(0.1)
                 time.sleep(1.0)
             elif level < args.target - 150:
                 if args.screenshare:
