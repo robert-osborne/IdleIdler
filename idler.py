@@ -1278,6 +1278,26 @@ def load_config():
         top_y = config.getint("idler", "top_hint_y")
         verbose_print("Config top_x,top_y = %d,%d" % (top_x, top_y))
 
+
+# object to support logging all of tracking logs to a permanent file
+class Tee(object):
+    def __init__(self, name, mode):
+        self.file = open(name, mode)
+        self.stdout = sys.stdout
+        sys.stdout = self
+
+    def __del__(self):
+        sys.stdout = self.stdout
+        self.file.close()
+
+    def write(self, data):
+        self.file.write(data)
+        self.stdout.write(data)
+
+    def flush(self):
+        self.file.flush()
+
+
 epilog="""Commands:
     The following commands are available:
 
@@ -1327,7 +1347,9 @@ def main_method():
         epilog=textwrap.dedent(epilog)
     )
 
-    # Steam startup
+    parser.add_argument("--tee", help="Also send output to a logfile (appending)",
+                        default=None,
+                        type=str)
 
     # meta
     parser.add_argument("-m", "--mirt", help="Set reasonable defaults for a Mirt run (no Deekin)",
@@ -1350,7 +1372,7 @@ def main_method():
                         help="Amount of time for Briv charging, either method (default %f)" % default_charge_time,
                         type=float)
 
-    #restart
+    #how to spec
     parser.add_argument("--specialization", default=config.getboolean("idler", "modron_specialization"),
                         dest="modron_specialization",
                         help="Specialization automaticaly done by modron.",
@@ -1457,6 +1479,9 @@ def main_method():
     verbose = args.verbose
 
     speed_team = config.get("idler", "speed_team")
+
+    if args.tee:
+        Tee(args.tee, "a")
 
     if args.vajra:
         speed_team = config.get("idler", "vajra_speed_team")
