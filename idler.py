@@ -87,6 +87,7 @@ have_gold = True
 bounty_size = "small"
 
 verbose = False
+debugging = False
 
 MENU_BUTTON_WIDTH = 30
 MENU_BUTTON_HEIGHT = 30
@@ -94,6 +95,12 @@ MENU_BUTTON_HEIGHT = 30
 def verbose_print(msg):
     global verbose
     if verbose:
+        print(msg)
+
+
+def debug_print(msg):
+    global debugging
+    if debugging:
         print(msg)
 
 
@@ -278,7 +285,7 @@ def activate_app(app_name, tries=2, reset_top=False):
 def load_level_images():
     images = {}
     for f in glob.glob('levels/*.png'):
-        verbose_print(f)
+        debug_print(f)
         images[f] = Image.open(f).convert('RGB').crop((0,0,60,56))
     return images
 
@@ -557,6 +564,9 @@ def locate(png_name, png_name2=None, click_image_index=0, search_region=None, ca
     if not screen_shot:
         screen_shot = pyautogui.screenshot(region=search_region)
         screen_shot.save("test"+png_name)
+    if search_region:
+        x_off = search_region[0]
+        y_off = search_region[1]
     try:
         if click_image_index > 0:
             positions = pyautogui.locateAll(first_prefix+png_name,
@@ -565,13 +575,13 @@ def locate(png_name, png_name2=None, click_image_index=0, search_region=None, ca
                                             )
             positions = list(positions)
             box = positions[click_image_index]
-            by2 = pyautogui.Point((box.left+(box.width/2)) / 2, (box.top+(box.height/2)) / 2)
+            by2 = pyautogui.Point((x_off+box.left+(box.width/2)) / 2, (y_off+box.top+(box.height/2)) / 2)
         else:
             box = pyautogui.locate(first_prefix+png_name,
                                    screen_shot,
                                    grayscale=True,
                                    )
-            by2 = pyautogui.Point((box.left+(box.width/2)) / 2, (box.top+(box.height/2)) / 2)
+            by2 = pyautogui.Point((x_off+box.left+(box.width/2)) / 2, (y_off+box.top+(box.height/2)) / 2)
         verbose_print("locate(%s) = %s" % (png_name, str(by2)))
         return by2
     except Exception as e:
@@ -669,9 +679,10 @@ def shutdown_app():
                 window.close()
                 time.sleep(20.0)
                 return
-            print("Error: shutdown: No exact match for 'Idle Champions'")
-            raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
-    except Exception:
+            print("Warning: shutdown: '%s' not an exact match for '%s'" % (window.title, APP_name))
+        raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
+    except Exception as e:
+        raise gw.PyGetWindowException("ERROR: shutdown: '%s'" % e)
         return
 
 
@@ -755,7 +766,7 @@ def click_ok(count=1, startup=False, ic_app=None):
     found_ok = False
     move = 50
     # loop attempting a "smart" startup using remembered or hinted top_x, top_y
-    known_okays = [(635, 505), (635, 475), (635, 565)]
+    known_okays = [(635, 505), (635, 475), (635, 565), (750, 370)]
     ready = False
     found_menu = False
     for s in range(count, 0, -1):
@@ -1199,10 +1210,11 @@ def click_first_spec(delay=0.0):
 
 
 def click_with_position(image, target, offset_x=0, offset_y=0, click=True):
+    verbose_print("click_with_position(%s,%s)" % (image, str(target)))
     if not target:
         time.sleep(0.2)
         target = locate(image)
-    pyautogui.moveTo(target.x+offset_x, target.y+offset_y)
+    pyautogui.moveTo(target.x+offset_x, target.y+offset_y, duration=0.0)
     time.sleep(0.1)
     if click:
         pyautogui.click()
@@ -1442,8 +1454,8 @@ def main_method():
                         action="store_true")
     parser.add_argument("-x", "--experimental", help="Don't use this.",
                         action="store_true")
-    parser.add_argument("--verbose", help="Debugging aid.",
-                        action="store_true")
+    parser.add_argument("--verbose", help="Debugging aid.", action="store_true")
+    parser.add_argument("--debug", help="Debugging aid, very noisy.", action="store_true")
     parser.add_argument("--screenshare", "--ss",
         help="Screen share accept active.",
         action="store_true")
@@ -1801,6 +1813,9 @@ def main_method():
         except Exception:
             print("Error: could not find bounty image %s: is the inventory open?" % (start_image))
             sys.exit(1)
+        if not bounty_target:
+            print("Error: could not find bounty image %s: is the inventory open?" % (start_image))
+            sys.exit(1)
         # use offset instead of image find ...
         bar_target = with_top_offset(742, 386, as_point=True)
         go_target = with_top_offset(555, 432, as_point=True)
@@ -1815,8 +1830,9 @@ def main_method():
             go_target = click_with_position("bountygo.png", go_target)
             # drops can take a while to process, give it sec or two
             if loops >= args.loops:
-                sys.exit(1)
+                sys.exit(0)
             time.sleep(1.5)
+        sys.exit(0)
 
     if args.command == "silver":
         mouse_move_speed = 0.5
@@ -1867,6 +1883,7 @@ def main_method():
             restart_stacking(args)
             if s > 1:
                 time.sleep(15.0)
+        sys.exit(0)
 
     if args.command == "testboss":
         time.sleep(2.0)
