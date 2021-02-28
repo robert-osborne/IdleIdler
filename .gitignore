@@ -1,6 +1,7 @@
 # IdleIdler
 local.cfg
 .idler
+.idea
 
 ## Byte-compiled / optimized / DLL files
 __pycache__/
