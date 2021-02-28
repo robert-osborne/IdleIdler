@@ -670,8 +670,20 @@ def check_crashed_app():
     startup_idle_champions()
 
 
-def shutdown_app():
-    verbose_print("Shutdown Idle Champions")
+def shutdown_app(keyboard=True):
+    if keyboard:
+        verbose_print("Shutdown Idle Champions with CMD-Q")
+        app = activate_app(APP_NAME)
+        debug_print("App for CMD-q %s" % app.title)
+        if app:
+            debug_print("Sending CMD-q")
+            pyautogui.hotkey('command', 'q', interval=0.1)
+            # pyautogui.keyDown('command')
+            # pyautogui.press('q')
+            # pyautogui.keyUp('command')
+            return
+
+    verbose_print("Shutdown Idle Champions with close")
     try:
         windows = gw.getWindowsWithTitle(APP_NAME)
         for window in windows:
@@ -958,7 +970,7 @@ def place_click_familiars(num_familiars):
 
 def restart_stacking(args):
     charge_time = args.charge
-    shutdown_app()
+    shutdown_app(args.keyboard_shutdown)
     time.sleep(charge_time)
     startup_idle_champions()
 
@@ -1006,7 +1018,7 @@ def charge_briv(level, plus, images, args):
 
     # restart charging ... so good
     if restart:
-        shutdown_app()
+        shutdown_app(args.keyboard_shutdown)
         accept_screen_share(screenshare)
         time.sleep(charge_time)
         startup_idle_champions()
@@ -1310,6 +1322,76 @@ class Tee(object):
         self.file.flush()
 
 
+# object to support logging all of tracking logs to a permanent file
+class Tracker(object):
+    file = None
+    started = False
+    verbose = False
+    zones = None
+    bosses_per_run = None
+    start_of_session = None
+
+    total_runs = 0
+    start_of_run = None
+    longest_run = None
+    bosses_this_session = None
+
+    def __init__(self, now, zones=0, verbose=False, logfile=None, log_mode="a"):
+        self.start_of_session = None
+        self.start_of_run = None
+        self.zones = zones
+        self.bosses_per_run = self.zones / 5
+
+        self.bosses_this_session = 0
+        self.total_runs = 0
+        self.started = False
+
+        if logfile:
+            self.file = open(logfile, log_mode)
+
+    def elapsed(self, td):
+        seconds = td.total_seconds()
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = seconds % 60
+        return hours, minutes, seconds
+
+    def start_loop(self, now, level, plus):
+        if not self.started:
+            self.start_of_run = now
+            self.start_of_session = now
+            self.started = True
+            return
+
+        self.total_runs += 1
+        print("Loop %d started: %s: %d%s" % (self.total_runs, now, level, "+" if plus else ""))
+
+        self.bosses_this_session += self.bosses_per_run
+
+        run_elapsed = now - self.start_of_run
+        run_bph = float(self.bosses_per_run) / float(run_elapsed.total_seconds()) * 60.0 * 60.0
+        run_hours, run_minutes, run_seconds = self.elapsed(run_elapsed)
+
+        session_elapsed = now - self.start_of_session
+        session_bph = float(self.bosses_this_session) / float(session_elapsed.total_seconds()) * 60.0 * 60.0
+        session_hours, session_minutes, session_seconds = self.elapsed(session_elapsed)
+
+        print("Session: %d:%d:%d BPH: %.2f Run: %d:%d:%d BPH: %.2f" % (
+            session_hours, session_minutes, session_seconds,
+            session_bph,
+            run_hours, run_minutes, run_seconds,
+            run_bph,
+        ))
+
+        self.start_of_run = now
+
+    def flush(self):
+        self.file.flush()
+
+    def start_tracking(self, now, level, plus):
+        print("Gem farming session started: %s: with detected level %d%s" % (now, level, "+" if plus else ""))
+
+
 epilog="""Commands:
     The following commands are available:
 
@@ -1334,7 +1416,7 @@ epilog="""Commands:
 
 
 def main_method():
-    global top_x, top_y, top_offset, verbose, infinite_loop
+    global top_x, top_y, top_offset, debugging, verbose, infinite_loop
     load_config()
 
     # get defaults from config file
@@ -1362,6 +1444,14 @@ def main_method():
     parser.add_argument("--tee", help="Also send output to a logfile (appending)",
                         default=None,
                         type=str)
+    parser.add_argument("--keyboard-shutdown",
+                        dest="keyboard_shutdown",
+                        default=config.getboolean("idler", "keyboard_shutdown"),
+                        help="Shutdown %s by sending CMD-Q" % APP_NAME, action="store_true")
+    parser.add_argument("--no-keyboard-shutdown", "--close",
+                        dest="keyboard_shutdown",
+                        help="Shutdown %s by closing the app." % APP_NAME,
+                        action="store_false")
 
     # meta
     parser.add_argument("-m", "--mirt", help="Set reasonable defaults for a Mirt run (no Deekin)",
@@ -1471,6 +1561,7 @@ def main_method():
                         help="Key that hits Hews's ult. (default %s)" % config.get('idler', 'hew_ult'),
                         type=str)
 
+    # Commands and arguments
     parser.add_argument('command', metavar='command', type=str, nargs="?",
                         help="""Action to perform (modron, stats, run, silver, stack, bounty, keep-alive)
                         run: loop on adventures for N minutes to acquire gems and/or patron currency
@@ -1484,11 +1575,14 @@ def main_method():
                         default=0)
     args = parser.parse_args()
 
+    verbose = args.verbose
+    debugging = args.debug
+
     verbose_print("Command = %s" % args.command)
+    debug_print("Debugging On")
 
     top_offset = args.header
     patron = "None"
-    verbose = args.verbose
 
     speed_team = config.get("idler", "speed_team")
 
@@ -1619,6 +1713,30 @@ def main_method():
             f.write("# created by idler.py, a Idle Champions script engine\n")
             f.write("# Warning: edit at on risk\n")
             init_config.write(f)
+        sys.exit(0)
+
+    if args.command == "Tracker" or args.command == "Track":
+        print("Test Tracker ...")
+        try:
+            now = datetime.datetime.now()
+            tracker = Tracker(now=now-datetime.timedelta(minutes=11, seconds=12),
+                              zones=args.target,
+                              verbose=verbose,)
+            print("start track %s" % now)
+            tracker.start_tracking(now, 20, False)
+            print("start loop %s" % now)
+            tracker.start_loop(now, 221, False)
+            now = now + datetime.timedelta(minutes=11, seconds=12)
+            print("start loop %s" % now)
+            tracker.start_loop(now, 1, False)
+            now = now + datetime.timedelta(minutes=10, seconds=33)
+            print("start loop T %s" % now)
+            tracker.start_loop(now, 1, True)
+            now = now + datetime.timedelta(minutes=12, seconds=1)
+            print("start loop %s" % now)
+            tracker.start_loop(now, 6, False)
+        except Exception as e:
+            print("Error: %s" % str(e))
         sys.exit(0)
 
     if args.command == "testhunt":
@@ -1932,8 +2050,13 @@ def main_method():
         need_leveling = not config.getboolean("idler", "familiar_leveling")
         log_initial = True
         last_level = -1
-        last_level_time = datetime.datetime.now()
+        now = datetime.datetime.now()
+        tracker = Tracker(now=now,
+                          zones=args.target,
+                          verbose=verbose,)
+        last_level_time = now
         while True:
+            now = datetime.datetime.now()
             try:
                 level, plus = get_current_zone(level_images, args.save_mismatch)
                 verbose_print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
@@ -1943,12 +2066,12 @@ def main_method():
                 plus = False
             verbose_print("Level %d" % level)
             if log_initial:
-                print("Looping started: %s with detected level %d" % (datetime.datetime.now(), level))
+                tracker.start_tracking(now, level, plus)
                 log_initial = False
             # check for stalled or hung game
             if last_level == level and level > 0:
                 # check delta
-                delta = (datetime.datetime.now() - last_level_time).total_seconds()
+                delta = (now - last_level_time).total_seconds()
                 if delta > 45:
                     # try 'q' 'g' to see if it unsticks
                     pyautogui.press('q')
@@ -1957,12 +2080,12 @@ def main_method():
                 if delta > 90:
                     print("Error stuck at zone %s at %s for %d seconds ..." % (level, datetime.datetime.now(), delta))
                     # kill the app and restart
-                    shutdown_app()
+                    shutdown_app(args.keyboard_shutdown)
                     # attempt restart below
                     level = -1
             else:
                 last_level = level
-                last_level_time = datetime.datetime.now()
+                last_level_time = now
 
             if level <= 0:
                 try:
@@ -1978,6 +2101,10 @@ def main_method():
                     time.sleep(10.0)
 
             elif level == 1 and need_leveling:
+                if log_restarted:
+                    log_restarted = False
+                    tracker.start_loop(now, level, plus)
+                    print("Loop started %s: %d" % (datetime.datetime.now(), level))
                 # Manual leveling
                 level_team_with_keys(args, speed_team, between_champs=DEFAULT_DELAY)
                 need_leveling = False
@@ -1985,8 +2112,8 @@ def main_method():
             elif level < 40 and need_havi_ult:
                 need_recharge = True
                 if log_restarted:
+                    tracker.start_loop(now, level, plus)
                     log_restarted = False
-                    print("Loop started %s: %d" % (datetime.datetime.now(), level))
                 if level >= 11:
                     need_havi_ult = False
                     print("Havi Ult")
