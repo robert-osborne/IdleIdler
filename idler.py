@@ -353,18 +353,21 @@ def get_level_region():
 
 
 boss = Image.open("levels/bosss.png").convert('RGB')
-def on_boss():
+def on_boss(save_images=False):
     # grab boss icon, on boss if it is black
     region = region_for_screenshot(1154, 93, 22, 22)
     # boss
     # x = x + 2219 - 1829
     # y = y + 10 - 14
     im1 = pyautogui.screenshot(region=region).convert('RGB')
-    im1.save("onboss.png")
-    boss.save("theboss.png")
+    if save_images:
+        im1.save("onboss.png")
+        boss.save("theboss.png")
     diff = ImageChops.difference(im1, boss)
+    if save_images:
+        diff.save("bossdiff.png")
     stat = ImageStat.Stat(diff)
-    if stat.mean[0] < 0.2 and stat.mean[1] < 0.3 and stat.mean[2] < 0.1:
+    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
         return True
     return False
 
@@ -1433,6 +1436,7 @@ def main_method():
     steam_start_x = get_bool_config(config, "steam_start_x", True)
     default_charge_time = config.getfloat("idler", "briv_charge_time")
     briv_restart_charging = config.getboolean("idler", "briv_restart_charging")
+    briv_boss_handling = config.getboolean("idler", "briv_boss_handling")
 
     level_images = load_level_images()
 
@@ -1473,6 +1477,9 @@ def main_method():
     parser.add_argument("--charge", default=default_charge_time,
                         help="Amount of time for Briv charging, either method (default %f)" % default_charge_time,
                         type=float)
+    parser.add_argument("--no-boss", default=default_charge_time,
+                        help="Amount of time for Briv charging, either method (default %f)" % default_charge_time,
+                        type=float)
 
     #how to spec
     parser.add_argument("--specialization", default=config.getboolean("idler", "modron_specialization"),
@@ -1484,6 +1491,15 @@ def main_method():
                         help="Specialization not automaticaly done by modron.",
                         action="store_false")
 
+    #skip boss
+    parser.add_argument("--briv-boss", default=briv_boss_handling,
+                        dest="briv_boss",
+                        help="Remove Briv if on a boss (Quad Briv) via formation 'e'",
+                        action="store_true")
+    parser.add_argument("--no-briv-boss",
+                        dest="briv_boss",
+                        help="No special handling for Briv on bosses",
+                        action="store_false")
     #restart
     parser.add_argument("--restart", default=briv_restart_charging,
                         dest="restart",
@@ -2121,18 +2137,21 @@ def main_method():
                         pyautogui.press(args.havi_ult)
                         time.sleep(0.1)
                 time.sleep(1.0)
-            elif level < args.target - 150:
-                if args.screenshare:
-                    accept_screen_share(args.screenshare)
-                    foreground_or_start()
-                    time.sleep(10.0)
+            elif level < args.target - 100:
+                diff = args.target - level
+                if args.briv_boss:
+                    # foreground_or_start()
+                    debug_print("checking for team on_boss")
+                    if on_boss():
+                        verbose_print("team is on_boss")
+                        pyautogui.press('e')
+                        time.sleep(10.0)
+                        pyautogui.press('q')
+                    if args.screenshare:
+                        accept_screen_share(args.screenshare)
                 else:
-                    time.sleep(120.0)
-                foreground_or_start()
-            elif level < args.target - 50:
-                time.sleep(5.0)
-                accept_screen_share(args.screenshare)
-                foreground_or_start()
+                    time.sleep(diff*1.0)
+                    foreground_or_start()
             elif level < args.target - args.briv_recharge_areas:
                 continue
             else:
