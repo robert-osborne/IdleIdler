@@ -1136,6 +1136,7 @@ TEAM_DEFINITIONS = {
     "binwin":  {"key": "f3",  "bs": 21, "as": 30, "spec": "2_of_2", },
     "drizzt":  {"key": "f9",  "bs": 19, "as": 30, "spec": "1_of_2", },
     "omin":    {"key": "f3",  "bs": 20, "as": 70, "spec": "2_of_3", },
+    "jarlaxle":{"key": "f4",  "bs": 12, "as": 30, "spec": "2_of_2", },
 
     # fix
     "minsc":   {"key": "f7",  "bs": 4,  "as": 30, "spec": "2_of_2", },
