@@ -389,7 +389,7 @@ def get_current_zone(level_images, save=False, tries=LEVEL_TRYS):
                     break
                 try:
                     level = int(name[7:10])
-                    plus = (name[10:11] == 's')
+                    plus = (name[10:11] != 's')
                     return level, plus
                 except Exception:
                     break
@@ -1509,6 +1509,10 @@ def main_method():
     parser.add_argument("--no-restart", help="Briv charging by waiting.",
                         dest="restart",
                         action="store_false")
+    parser.add_argument("--charge-shandie", default=config.getint("idler", "charge_shandie"),
+                        dest="charge_shandie",
+                        help="Charge Shandie's dash on startup (default %d seconds)" % 0,
+                        type=int)
 
     parser.add_argument("--size", default="small",
                         help="Size of bounties to open (small or medium,default small)",
@@ -2056,10 +2060,12 @@ def main_method():
         #     verified = verify_menu(update=False)
         # except Exception:
         #     print("ERROR: Can't verify menu location. Exiting.")
-        print("Modron Gem Farming: Briv recharge area=%d; modron goal area=%d; charge=%f seconds; havi ult=%s; hew ult=%s" % (
+        print("Modron Gem Farming: Briv recharge=%d; modron goal=%d; charge=%f seconds; havi ult=%s; hew ult=%s shandie=%ds" % (
             args.target-args.briv_recharge_areas,
             args.target,
-            args.charge, args.havi_ult, args.hew_ult))
+            args.charge, args.havi_ult, args.hew_ult,
+            args.charge_shandie
+        ))
         print("(Hit CTRL-C to stop or move mouse to the corner of the screen)")
         need_havi_ult = True
         need_recharge = True
@@ -2103,7 +2109,6 @@ def main_method():
             else:
                 last_level = level
                 last_level_time = now
-
             if level <= 0:
                 try:
                     verbose_print("Error: is restart needed?")
@@ -2117,6 +2122,19 @@ def main_method():
                     print("Error restarting... wait and try again %s" % str(e))
                     time.sleep(10.0)
 
+            elif level == 1 and not plus and args.charge_shandie > 0:
+                if log_restarted:
+                    log_restarted = False
+                    tracker.start_loop(now, level, plus)
+                    print("Loop started %s: %d" % (datetime.datetime.now(), level))
+                print("Charging shandie for %d seconds" % args.charge_shandie)
+                pyautogui.press("g")
+                for i in range(0,20):
+                    pyautogui.press("f6")
+                time.sleep(args.charge_shandie)
+                foreground_or_start()
+                pyautogui.press("g")
+                time.sleep(2.0)
             elif level == 1 and need_leveling:
                 if log_restarted:
                     log_restarted = False
