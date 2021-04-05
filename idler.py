@@ -703,76 +703,82 @@ def shutdown_app(keyboard=True):
 
 # Startup using Steam App
 # Warning: will shutdown app if running!
-def startup_idle_champions():
+def startup_idle_champions(tries=5):
     # TODO: loop on this block until we find menu.png if not using preset top_x, top_y
     # Bring up steam
     print("Restarting Idle Champions")
 
-    if config.getboolean("idler", "shortcut_restarting"):
-        verbose_print("Starting app with shortcut")
-        try:
-            short_cut = os.path.join(Path.home(), config.get("idler", "shortcut_path"))
-            if not os.path.exists(short_cut):
-                print("ERROR: create a %s desktop short cut using Steam" % short_cut)
+    for attempt in range(0,tries):
+
+        if config.getboolean("idler", "shortcut_restarting"):
+            verbose_print("Starting app with shortcut")
+            try:
+                short_cut = os.path.join(Path.home(), config.get("idler", "shortcut_path"))
+                if not os.path.exists(short_cut):
+                    print("ERROR: create a %s desktop short cut using Steam" % short_cut)
+                    sys.exit(1)
+                result = os.system("open '%s'" % short_cut)
+                verbose_print("open shortcut_path (%s) returns %s" % (short_cut, str(result)))
+            except Exception as e:
+                print("ERROR: could not launch %s" % short_cut)
+                print("ERROR: %s" % str(e))
                 sys.exit(1)
-            result = os.system("open '%s'" % short_cut)
-            verbose_print("open shortcut_path (%s) returns %s" % (short_cut, str(result)))
-        except Exception as e:
-            print("ERROR: could not launch %s" % short_cut)
-            print("ERROR: %s" % str(e))
-            sys.exit(1)
 
-    elif config.getboolean("idler", "shortcut_start_xy"):
-        # TODO: fall back to click_image if this fails
-        x = config.getint("steam", "start_x")
-        y = config.getint("steam", "start_y")
-        pyautogui.moveTo(x, y)
-        time.sleep(0.1)
-        pyautogui.click()
-        time.sleep(1.0)
-    else:
-        verbose_print("Looking for the steam app")
-        # move mouse to top corner
-        steam = activate_app("Steam")
-        # click [Play] or [Stop]
-        verbose_print("Clicking Play/Stop")
-        # NOTE: start_with_image is more finicky that start with x,y
-        if config.getboolean("steam", "start_with_image"):
-            click_image("steam_play.png")
+        elif config.getboolean("idler", "shortcut_start_xy"):
+            # TODO: fall back to click_image if this fails
+            x = config.getint("steam", "start_x")
+            y = config.getint("steam", "start_y")
+            pyautogui.moveTo(x, y)
+            time.sleep(0.1)
+            pyautogui.click()
+            time.sleep(1.0)
+        else:
+            verbose_print("Looking for the steam app")
+            # move mouse to top corner
+            steam = activate_app("Steam")
+            # click [Play] or [Stop]
+            verbose_print("Clicking Play/Stop")
+            # NOTE: start_with_image is more finicky that start with x,y
+            if config.getboolean("steam", "start_with_image"):
+                click_image("steam_play.png")
 
-    # now restore the app to front
-    print("Waiting for Idle to launch.")
-    found_app = False
-    ignore_errors = 20
-    for s in range(40, 0, -1):
-        verbose_print("  %d seconds" % (s/2))
-        time.sleep(0.5)
+        # now restore the app to front
+        print("Waiting for Idle to launch.")
+        found_app = False
+        ignore_errors = 20
+        for s in range(40, 0, -1):
+            verbose_print("  %d seconds" % (s/2))
+            time.sleep(0.5)
 
-        # bring to front
-        try:
-            windows = gw.getWindowsWithTitle(APP_NAME)
-            for window in windows:
-                if window.title == APP_NAME:
-                    found_app = activate_app(APP_NAME, reset_top=True)
-            raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
-        except gw.PyGetWindowException as a:
-            if s <= ignore_errors:
-                print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
-            else:
-                verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
-        except Exception as a:
-            if s <= ignore_errors:
-                print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
-            else:
-                verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            # bring to front
+            try:
+                windows = gw.getWindowsWithTitle(APP_NAME)
+                for window in windows:
+                    if window.title == APP_NAME:
+                        found_app = activate_app(APP_NAME, reset_top=True)
+                raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
+            except gw.PyGetWindowException as a:
+                if s <= ignore_errors:
+                    print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+                else:
+                    verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+            except Exception as a:
+                if s <= ignore_errors:
+                    print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
+                else:
+                    verbose_print("Not found yet: %s: %s" % (datetime.datetime.now(), a))
 
-        if found_app:
-            break
+            if found_app:
+                break
 
 
-    # click ok or find menu for 20 seconds
-    if click_ok(startup=True, count=20, ic_app=found_app):
-        return True
+        # click ok or find menu for 20 seconds
+        if click_ok(startup=True, count=20, ic_app=found_app):
+            return True
+
+        # Try killing the app and trying again
+        shutdown_app(True)
+
     return False
 
 
@@ -1973,7 +1979,7 @@ def main_method():
             time.sleep(1.5)
         sys.exit(0)
 
-    if args.command == "silver":
+    if args.command == "silver" or args.command == "gold":
         mouse_move_speed = 0.5
         time.sleep(mouse_move_speed)
         inventory_target = None
@@ -1991,9 +1997,12 @@ def main_method():
             # bar_target = click_with_position("bountybar.png", bar_target)
             click_offset(744, 385, duration=mouse_move_speed, delay=0.5)
             # go_target = click_with_position("openopen.png", go_target, click=False)
-            click_offset(551, 431, duration=mouse_move_speed, delay=2.5)
+            delay = 2.5
+            if args.command == "gold":
+                delay = 4.5
+            click_offset(551, 431, duration=mouse_move_speed, delay=delay)
             # flip_target = click_with_position("openflip.png", flip_target)
-            click_offset(726, 359, duration=mouse_move_speed, delay=2.5)
+            click_offset(726, 359, duration=mouse_move_speed, delay=delay)
             # click in same place for show all
             # flip_target = click_with_position("openflip.png", flip_target)
             click_offset(726, 359, duration=mouse_move_speed, delay=2.5)
@@ -2082,7 +2091,8 @@ def main_method():
             now = datetime.datetime.now()
             try:
                 level, plus = get_current_zone(level_images, args.save_mismatch)
-                verbose_print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+                if verbose:
+                    print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
             except Exception as e:
                 print("Error getting current level: %s" % str(e))
                 level = -2
