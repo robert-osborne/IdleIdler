@@ -64,6 +64,7 @@ NUM_FAMILIARS = 6
 COUNTDOWN = 5
 DEFAULT_DELAY = 0.7
 DEFAULT_DRAG = 0.1
+LEVEL_TRYS=20
 
 # Handle retinae vs standard displays by swapping prefixes
 first_prefix = "./images/sml-"
@@ -171,6 +172,7 @@ def location_for_screenshot(x,y):
 
 def safe_image_compare(im1, im2, max_mean=30):
     diff = ImageChops.difference(im1, im2)
+    diff.save("cmp-diff.png")
     stat = ImageStat.Stat(diff)
     # im1.save("safe_im1.png")
     # im2.save("safe_im2.png")
@@ -187,16 +189,22 @@ def safe_image_compare(im1, im2, max_mean=30):
 # ready is True if menu is not greyed out (e.g. no Okay button)
 menu_blue_png = Image.open("images/menu_blue.png")
 menu_blue = menu_blue_png.convert('RGB')
+menu_blue2_png = Image.open("images/menu_blue.png")
+menu_blue2 = menu_blue_png.convert('RGB')
 menu_grey_png = Image.open("images/menu_grey.png")
 menu_grey = menu_grey_png.convert('RGB')
+
+
 def check_for_menu():
     x, y = menu_location()
     # pyautogui.moveTo(x, y, duration=0.1)
     x, y = location_for_screenshot(x, y)
     im1 = pyautogui.screenshot(region=(x, y, MENU_BUTTON_WIDTH, MENU_BUTTON_HEIGHT)).convert('RGB')
-    # im1.save("testmenu.png")
+    im1.save("testmenu.png")
     # menu_blue.save("testblue.png")
     if safe_image_compare(im1, menu_blue):
+        return True, True
+    if safe_image_compare(im1, menu_blue2):
         return True, True
     if safe_image_compare(im1, menu_grey):
         return True, False
@@ -286,7 +294,7 @@ def load_level_images():
     images = {}
     for f in glob.glob('levels/*.png'):
         debug_print(f)
-        images[f] = Image.open(f).convert('RGB').crop((0,0,60,56))
+        images[f] = Image.open(f).convert('RGB').crop((0, 0, 60, 56))
     return images
 
 
@@ -353,12 +361,20 @@ def get_level_region():
 
 
 boss = Image.open("levels/bosss.png").convert('RGB')
-def on_boss(save_images=False):
+zone = Image.open("images/zone_complete.png").convert('RGB')
+
+
+def on_boss(save_images=False, fast=True):
     # grab boss icon, on boss if it is black
     region = region_for_screenshot(1154, 93, 22, 22)
     # boss
     # x = x + 2219 - 1829
     # y = y + 10 - 14
+    pause = pyautogui.PAUSE
+    if save_images:
+        pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0.0
+
     im1 = pyautogui.screenshot(region=region).convert('RGB')
     if save_images:
         im1.save("onboss.png")
@@ -367,12 +383,110 @@ def on_boss(save_images=False):
     if save_images:
         diff.save("bossdiff.png")
     stat = ImageStat.Stat(diff)
+
+    pyautogui.PAUSE = pause
+    pyautogui.FAILSAFE = True
     if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
         return True
     return False
 
 
-LEVEL_TRYS=20
+def zone_complete(save_images=False, fast=True):
+    # grab boss icon, on boss if it is black
+    region = region_for_screenshot(1154+75, 93-25, 5, 10)
+    # boss
+    # x = x + 2219 - 1829
+    # y = y + 10 - 14
+    pause = pyautogui.PAUSE
+    if fast:
+        pyautogui.FAILSAFE = False
+        pyautogui.PAUSE = 0.0
+
+    im1 = pyautogui.screenshot(region=region).convert('RGB')
+    if save_images:
+        im1.save("zonetest.png")
+        zone.save("zonefound.png")
+    diff = ImageChops.difference(im1, zone)
+    if save_images:
+        diff.save("diffdiff.png")
+    stat = ImageStat.Stat(diff)
+
+    if fast:
+        pyautogui.PAUSE = pause
+        pyautogui.FAILSAFE = True
+    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+        return True
+    return False
+
+
+# object to support finding images by index
+class LevelFinder(object):
+    levels = []
+    images = {}
+    black = None
+    index = 0
+
+    def load_level_images(self):
+        self.levels = []
+        self.images = {}
+        for f in glob.glob('levels/*.png'):
+            debug_print(f)
+            key = f[7:][:-4]
+            if key == "bosss" or key == "boss":
+                continue
+            if key == "black":
+                self.black = Image.open(f).convert('RGB').crop((0, 0, 60, 56))
+                continue
+            self.images[key] = Image.open(f).convert('RGB').crop((0, 0, 60, 56))
+            self.levels.append(key)
+        self.total_images = len(self.levels)
+        self.levels.sort()
+        return self.images
+
+    def __init__(self):
+        self.index = 0
+        self.total_images = 0
+        self.load_level_images()
+
+    def get_current_zone(self, save=False, tries=LEVEL_TRYS):
+        im = None
+        for i in range(0, tries):
+            verbose_print("get_current_zone attempt %d" % i)
+            region = get_level_region()
+            raw_im = pyautogui.screenshot(region=region)
+            im = raw_im.convert('RGB')
+
+            # check if black first ...
+            diff = ImageChops.difference(im, self.black)
+            stat = ImageStat.Stat(diff)
+            if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+                time.sleep(.1)
+                continue
+
+            # start search at last index ...
+            for idx in range(0, self.total_images):
+                key = self.levels[(self.index + idx) % self.total_images]
+                img = self.images[key]
+                diff = ImageChops.difference(im, img)
+                stat = ImageStat.Stat(diff)
+                if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+                    try:
+                        level = int(key[:3])
+                        plus = (key[-1:] != 's')
+                        self.index = (self.index + idx) % self.total_images
+                        if not plus:
+                            self.index -= 1
+                        print("idx = %d" % idx)
+                        return level, plus
+                    except Exception:
+                        break
+
+            if save:
+                im.save('my_screenshot%d.png' % i)
+            time.sleep(.1)
+        return -1, False
+
+
 def get_current_zone(level_images, save=False, tries=LEVEL_TRYS):
     im = None
     for i in range(0,tries):
@@ -676,15 +790,18 @@ def check_crashed_app():
 def shutdown_app(keyboard=True):
     if keyboard:
         verbose_print("Shutdown Idle Champions with CMD-Q")
-        app = activate_app(APP_NAME)
-        debug_print("App for CMD-q %s" % app.title)
-        if app:
-            debug_print("Sending CMD-q")
-            pyautogui.hotkey('command', 'q', interval=0.1)
-            # pyautogui.keyDown('command')
-            # pyautogui.press('q')
-            # pyautogui.keyUp('command')
-            return
+        try:
+            app = activate_app(APP_NAME)
+            if app:
+                debug_print("App for CMD-q %s" % app.title)
+                debug_print("Sending CMD-q")
+                pyautogui.hotkey('command', 'q', interval=0.1)
+                # pyautogui.keyDown('command')
+                # pyautogui.press('q')
+                # pyautogui.keyUp('command')
+                return
+        except Exception as e:
+            pass
 
     verbose_print("Shutdown Idle Champions with close")
     try:
@@ -698,7 +815,6 @@ def shutdown_app(keyboard=True):
         raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
     except Exception as e:
         raise gw.PyGetWindowException("ERROR: shutdown: '%s'" % e)
-        return
 
 
 # Startup using Steam App
@@ -1877,6 +1993,11 @@ def main_method():
             jumps += 1
         sys.exit(1)
 
+    if args.command == "check":
+        print("Test Startup Complete")
+        check_for_menu()
+        sys.exit(0)
+
     while args.command == "cmp":
         im1 = Image.open("my_screenshot0.png").convert('RGB')
         im2 = Image.open("levels/511.png").convert('RGB')
@@ -1918,6 +2039,16 @@ def main_method():
 
     # ########################################################################
     # Commands below this line require Idle Champions to be running
+
+    while args.command == "complete":
+        loops += 1
+        complete = zone_complete(save_images=True, fast=True)
+        if complete:
+            print("zone complete")
+        else:
+            print("zone incomplete")
+        if loops > 10000:
+            sys.exit(0)
 
     if args.command == "testfkey":
         print("level_team_with_keys(args,[%s])" % speed_team)
@@ -2075,6 +2206,7 @@ def main_method():
             args.charge, args.havi_ult, args.hew_ult,
             args.charge_shandie
         ))
+        finder = LevelFinder()
         print("(Hit CTRL-C to stop or move mouse to the corner of the screen)")
         need_havi_ult = True
         need_recharge = True
@@ -2090,7 +2222,7 @@ def main_method():
         while True:
             now = datetime.datetime.now()
             try:
-                level, plus = get_current_zone(level_images, args.save_mismatch)
+                level, plus = finder.get_current_zone(save=args.save_mismatch)
                 if verbose:
                     print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
             except Exception as e:
@@ -2135,9 +2267,10 @@ def main_method():
             elif level == 1 and not plus and log_restarted and args.charge_shandie > 0:
                 log_restarted = False
                 tracker.start_loop(now, level, plus)
-                print("Loop started %s: %d (charging shandie for %d seconds)" % (datetime.datetime.now(), level, args.charge_shandie))
+                print("Loop started %s: %d (charging shandie for %d seconds)" % (
+                    datetime.datetime.now(), level, args.charge_shandie))
                 pyautogui.press("g")
-                for i in range(0,20):
+                for i in range(0, 20):
                     pyautogui.press("f6")
                 time.sleep(args.charge_shandie)
                 foreground_or_start()
@@ -2164,17 +2297,17 @@ def main_method():
                         pyautogui.press(args.havi_ult)
                         time.sleep(0.1)
                 time.sleep(1.0)
-            elif level < args.target - 100:
+            elif level < args.target - 50:
                 diff = args.target - level
                 if args.briv_boss:
                     # foreground_or_start()
                     debug_print("checking for team on_boss")
-                    if on_boss():
+                    if on_boss(fast=True):
                         verbose_print("team is on_boss")
                         pyautogui.press('e')
                         pyautogui.press('g')
-                        while on_boss():
-                            pass
+                        while not zone_complete():
+                            print("zone uncomplete")
                         pyautogui.press('q')
                         time.sleep(0.5)
                         pyautogui.press('g')
@@ -2183,7 +2316,7 @@ def main_method():
                     if args.screenshare:
                         accept_screen_share(args.screenshare)
                 else:
-                    time.sleep(diff*1.0)
+                    time.sleep(diff*0.25)
                     foreground_or_start()
             elif level < args.target - args.briv_recharge_areas:
                 continue
@@ -2385,6 +2518,7 @@ def main_method():
 
     # print("%s" % list(pyautogui.locateAllOnScreen('./burger2.png')))
 
+
 if __name__ == "__main__":
     first_loop = True
     while first_loop or infinite_loop:
@@ -2392,3 +2526,4 @@ if __name__ == "__main__":
             main_method()
         except Exception as e:
             print("WARNING: exception caught: %s" % e)
+            time.sleep(5.0)
