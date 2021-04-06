@@ -2132,12 +2132,10 @@ def main_method():
                     print("Error restarting... wait and try again %s" % str(e))
                     time.sleep(10.0)
 
-            elif level == 1 and not plus and args.charge_shandie > 0:
-                if log_restarted:
-                    log_restarted = False
-                    tracker.start_loop(now, level, plus)
-                    print("Loop started %s: %d" % (datetime.datetime.now(), level))
-                print("Charging shandie for %d seconds" % args.charge_shandie)
+            elif level == 1 and not plus and log_restarted and args.charge_shandie > 0:
+                log_restarted = False
+                tracker.start_loop(now, level, plus)
+                print("Loop started %s: %d (charging shandie for %d seconds)" % (datetime.datetime.now(), level, args.charge_shandie))
                 pyautogui.press("g")
                 for i in range(0,20):
                     pyautogui.press("f6")
@@ -2174,7 +2172,13 @@ def main_method():
                     if on_boss():
                         verbose_print("team is on_boss")
                         pyautogui.press('e')
-                        time.sleep(10.0)
+                        pyautogui.press('g')
+                        while on_boss():
+                            pass
+                        pyautogui.press('q')
+                        time.sleep(0.5)
+                        pyautogui.press('g')
+                        time.sleep(0.5)
                         pyautogui.press('q')
                     if args.screenshare:
                         accept_screen_share(args.screenshare)
