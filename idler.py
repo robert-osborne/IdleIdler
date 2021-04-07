@@ -476,7 +476,7 @@ class LevelFinder(object):
                         self.index = (self.index + idx) % self.total_images
                         if not plus:
                             self.index -= 1
-                        print("idx = %d" % idx)
+                        # print("idx = %d" % idx)
                         return level, plus
                     except Exception:
                         break
@@ -2307,7 +2307,8 @@ def main_method():
                         pyautogui.press('e')
                         pyautogui.press('g')
                         while not zone_complete():
-                            print("zone uncomplete")
+                            # print("zone uncomplete")
+                            pass
                         pyautogui.press('q')
                         time.sleep(0.5)
                         pyautogui.press('g')
