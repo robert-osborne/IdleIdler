@@ -1106,43 +1106,21 @@ def charge_briv(level, plus, images, args):
     briv_target = args.target - args.briv_recharge_areas
     restart = args.restart
 
-    GO_BACK_DELAY=9
-    pyautogui.press("w")
-    time.sleep(0.5)
+    print("Recharging Briv starting at %s" % (datetime.datetime.now()))
+    GO_BACK_DELAY=2.0
     pyautogui.press("g")
     time.sleep(0.5)
+    pyautogui.press("w")
+    # time to settle
+    time.sleep(2.0)
 
-    print("Recharging Briv starting at %s" % (datetime.datetime.now()))
-
-    # make sure we are not on a boss or zone without a spinner
-    while True:
-        verbose_print("charge_briv %d %s" % (level, plus))
-        if level == briv_target and on_boss():
-            verbose_print("    %d & boss; go back one" % level)
-            pyautogui.press("left")
-            time.sleep(GO_BACK_DELAY)
-            break
-        elif level == briv_target:
-            verbose_print("    Just go for it %d" % level)
-            break
-            pyautogui.press("left")
-            time.sleep(GO_BACK_DELAY)
-            try:
-                level, plus = get_current_level(x, y, level_images, False)
-            except Exception:
-                break
-        elif level == briv_target + 6 and plus:
-            pyautogui.press("left")
-            time.sleep(GO_BACK_DELAY)
-            pyautogui.press("left")
-            time.sleep(GO_BACK_DELAY)
-            break
-        else:
-            verbose_print("   Done")
-            break
 
     # restart charging ... so good
     if restart:
+        if on_boss():
+            verbose_print("    %d & boss; go back one" % level)
+            pyautogui.press("left")
+            time.sleep(GO_BACK_DELAY)
         shutdown_app(args.keyboard_shutdown)
         accept_screen_share(screenshare)
         time.sleep(charge_time)
@@ -1151,6 +1129,33 @@ def charge_briv(level, plus, images, args):
 
     # manual charging ... still better than a poke in the eye with a sharp stick
     else:
+        # make sure we are not on a boss or zone without a spinner
+        while True:
+            verbose_print("charge_briv %d %s" % (level, plus))
+            if on_boss():
+                verbose_print("    %d & boss; go back one" % level)
+                pyautogui.press("left")
+                time.sleep(GO_BACK_DELAY)
+                break
+            elif level == briv_target:
+                verbose_print("    Just go for it %d" % level)
+                break
+                pyautogui.press("left")
+                time.sleep(GO_BACK_DELAY)
+                try:
+                    level, plus = get_current_level(x, y, level_images, False)
+                except Exception:
+                    break
+            elif level == briv_target + 6 and plus:
+                pyautogui.press("left")
+                time.sleep(GO_BACK_DELAY)
+                pyautogui.press("left")
+                time.sleep(GO_BACK_DELAY)
+                break
+            else:
+                verbose_print("   Done")
+                break
+
         charging = charge_time
         while charging > 0.0:
             verbose_print("Charging Briv: %f more seconds" % (charging))
