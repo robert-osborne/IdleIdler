@@ -2223,7 +2223,9 @@ def main_method():
             now = datetime.datetime.now()
             try:
                 level, plus = finder.get_current_zone(save=args.save_mismatch)
-                if verbose:
+                if verbose and not debugging:
+                    print("Zone found %d (at start zone: %s)" % (level, plus))
+                if debugging:
                     print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
             except Exception as e:
                 print("Error getting current level: %s" % str(e))
@@ -2269,13 +2271,15 @@ def main_method():
                 tracker.start_loop(now, level, plus)
                 print("Loop started %s: %d (charging shandie for %d seconds)" % (
                     datetime.datetime.now(), level, args.charge_shandie))
+                time.sleep(0.2)
                 pyautogui.press("g")
                 for i in range(0, 20):
                     pyautogui.press("f6")
                 time.sleep(args.charge_shandie)
                 foreground_or_start()
+                time.sleep(0.5)
                 pyautogui.press("g")
-                time.sleep(2.0)
+                time.sleep(5.0)
             elif level == 1 and need_leveling:
                 if log_restarted:
                     log_restarted = False
@@ -2314,6 +2318,7 @@ def main_method():
                         pyautogui.press('g')
                         time.sleep(0.5)
                         pyautogui.press('q')
+                        time.sleep(1.0)
                     if args.screenshare:
                         accept_screen_share(args.screenshare)
                 else:
@@ -2330,7 +2335,6 @@ def main_method():
                     verbose_print("Recharge finished: %s" % last_level_time)
                     need_recharge = False
                 need_havi_ult = True
-                time.sleep(1.0)
 
     OFFSET_xx2 = 1925 - OFFSET_xx1
     OFFSET_xx3 = 2025 - OFFSET_xx1
