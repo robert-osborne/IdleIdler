@@ -1172,9 +1172,9 @@ def charge_briv(level, plus, images, args):
     pyautogui.press("left")
     time.sleep(1.5)
     pyautogui.press("q")
-    time.sleep(2.0)
+    time.sleep(0.25)
     pyautogui.press("g")
-    time.sleep(2.0)
+    time.sleep(0.25)
     pyautogui.press("q")
 
     return True
@@ -2267,16 +2267,23 @@ def main_method():
                     time.sleep(10.0)
 
             elif level == 1 and not plus and log_restarted and args.charge_shandie > 0:
+                need_recharge = True
                 log_restarted = False
+                time.sleep(0.2)
+                pyautogui.press("g")
                 tracker.start_loop(now, level, plus)
                 print("Loop started %s: %d (charging shandie for %d seconds)" % (
                     datetime.datetime.now(), level, args.charge_shandie))
-                time.sleep(0.2)
-                pyautogui.press("g")
+                for i in range(0, 20):
+                    pyautogui.press("f5")
                 for i in range(0, 20):
                     pyautogui.press("f6")
                 time.sleep(args.charge_shandie)
                 foreground_or_start()
+                if need_havi_ult:
+                    need_havi_ult = False
+                    print("Havi Ult")
+                    pyautogui.press(args.havi_ult)
                 time.sleep(0.5)
                 pyautogui.press("g")
                 time.sleep(5.0)
@@ -2325,8 +2332,10 @@ def main_method():
                     time.sleep(diff*0.25)
                     foreground_or_start()
             elif level < args.target - args.briv_recharge_areas:
+                verbose_print("continue at %d" % level)
                 continue
             else:
+                verbose_print("check for recharge at %d" % level)
                 log_restarted = True
                 if need_recharge:
                     charge_briv(level, plus, level_images, args)
