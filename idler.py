@@ -1911,7 +1911,7 @@ def main_method():
         pos = pyautogui.position()
         print("raw mouse: %s" % str(pos))
         off_x, off_y = print_reverse_without_offset(int(pos.x), int(pos.y))
-        # print("offset from top_x,top_y = %d, %d" % (off_x, off_y))
+        print("offset from top_x,top_y = %d, %d" % (off_x, off_y))
         sys.exit(0)
 
     if args.command == "zone":
@@ -2197,6 +2197,50 @@ def main_method():
         print("%d, %d vs %s" % (x, y, region))
         level, plus = get_current_level(x, y, level_images, args.save_mismatch)
         print("old %s, %s" % (level, plus))
+        sys.exit(0)
+
+    if args.command == "jimmy":
+        finder = LevelFinder()
+        for i in range(1,args.loops+1):
+            now = datetime.datetime.now()
+            print("Jimmy loops %d of %d (%s)" % (i, args.loops, str(now)))
+            pyautogui.press('g')
+            time.sleep(0.5)
+            pyautogui.press('w')
+            time.sleep(3.0)
+            pyautogui.press('e')
+            # level, plus = finder.get_current_zone()
+            # need images for the above
+            level = 1000
+            if level >= 1490:
+                print("Jimmy exiting at level %d" % (level))
+                pyautogui.press('left')
+                pyautogui.press('left')
+                pyautogui.press('left')
+                pyautogui.press('left')
+                pyautogui.press('left')
+                pyautogui.press('left')
+                pyautogui.press('left')
+                sys.exit(0)
+            
+            time.sleep(args.charge)
+            # click back to 1
+            for j in range(0,4):
+                pyautogui.keyDown('shift')
+                time.sleep(0.1)
+                click_offset(924, 105)
+                pyautogui.keyUp('shift')
+                time.sleep(1.0)
+                click_offset(971, 106)
+                time.sleep(3.0)
+                pyautogui.keyDown('shift')
+                time.sleep(0.1)
+                click_offset(924, 105)
+                pyautogui.keyUp('shift')
+                time.sleep(1.0)
+                click_offset(971, 106)
+                pyautogui.keyUp('shift')
+            time.sleep(args.charge)
         sys.exit(0)
 
     if args.command == "modron":
