@@ -47,6 +47,9 @@ DEFAULT_ADVENTURE = "madwizard"
 DEFAULT_LEVEL_DELAY = 20
 NUM_FAMILIARS = 6
 
+MAX_TOTAL_IMAGE_MEAN = 35.0
+MAX_IMAGE_MEAN = 10.0
+
 # TODO: launch checklist
 # [ ] Change run to no-modron, just charge briv at end of timer
 # [ ] Create backup git on github with full history
@@ -170,18 +173,30 @@ def location_for_screenshot(x,y):
     return screen_scale * x, screen_scale * y
 
 
-def safe_image_compare(im1, im2, max_mean=30):
+def safe_image_compare(im1, im2, save=False, max_mean=MAX_TOTAL_IMAGE_MEAN):
     diff = ImageChops.difference(im1, im2)
-    diff.save("cmp-diff.png")
     stat = ImageStat.Stat(diff)
     # im1.save("safe_im1.png")
     # im2.save("safe_im2.png")
-    # verbose_print("mean=%s" % str(stat.mean))
-    # verbose_print("rms=%s" % str(stat.rms))
+    verbose_print("mean=%s" % str(stat.mean))
+    verbose_print("rms=%s" % str(stat.rms))
 
-    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < max_mean:
-        return True
-    return False
+    match = True
+    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) > max_mean:
+        match = False
+    if stat.mean[0] > MAX_IMAGE_MEAN:
+        match = False
+    if stat.mean[1] > MAX_IMAGE_MEAN:
+        match = False
+    if stat.mean[2] > MAX_IMAGE_MEAN:
+        match = False
+
+    if save and not match:
+        im1.save("cmp-im1.png")
+        im2.save("cmp-im2.png")
+        diff.save("cmp-diff.png")
+
+    return match
 
 
 # returns found, ready
@@ -386,9 +401,7 @@ def on_boss(save_images=False, fast=True):
 
     pyautogui.PAUSE = pause
     pyautogui.FAILSAFE = True
-    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
-        return True
-    return False
+    return safe_image_compare(im1, boss)
 
 
 def zone_complete(save_images=False, fast=True):
@@ -414,7 +427,7 @@ def zone_complete(save_images=False, fast=True):
     if fast:
         pyautogui.PAUSE = pause
         pyautogui.FAILSAFE = True
-    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+    if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < MAX_IMAGE_MEAN:
         return True
     return False
 
@@ -459,7 +472,7 @@ class LevelFinder(object):
             # check if black first ...
             diff = ImageChops.difference(im, self.black)
             stat = ImageStat.Stat(diff)
-            if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+            if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < MAX_IMAGE_MEAN:
                 time.sleep(.1)
                 continue
 
@@ -469,7 +482,7 @@ class LevelFinder(object):
                 img = self.images[key]
                 diff = ImageChops.difference(im, img)
                 stat = ImageStat.Stat(diff)
-                if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < 20.0:
+                if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < MAX_IMAGE_MEAN:
                     try:
                         level = int(key[:3])
                         plus = (key[-1:] != 's')
@@ -521,7 +534,7 @@ def get_current_level(x, y, level_images, save=False):
         for name, img in level_images.items():
             diff = ImageChops.difference(im.convert('RGB'), img)
             stat = ImageStat.Stat(diff)
-            if stat.mean[0] < 0.3 and stat.mean[1] < 0.6 and stat.mean[2] < 0.35:
+            if (stat.mean[0] + stat.mean[1] + stat.mean[2]) < MAX_IMAGE_MEAN:
                 match = name[7:10]
                 if match == "bla" or match == "bos":
                     break
@@ -1919,10 +1932,13 @@ def main_method():
         time.sleep(1)
         found_app = activate_app(APP_NAME, reset_top=True)
         time.sleep(1)
-        level, plus = get_current_zone(level_images, True)
-        print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
+        finder = LevelFinder()
+        level, plus = finder.get_current_zone(True)
+        print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, not plus, on_boss()))
         if level <= 0:
             print("Could not find zone, zone image saved in my_screenshot*.png")
+        found, grey = check_for_menu()
+        print("Menu found=%s greyed out=%s" % (found, grey))
         sys.exit(0)
 
     no_modron_commands = ["run", "no-core", "no-modron", ]
@@ -2004,8 +2020,8 @@ def main_method():
         sys.exit(0)
 
     while args.command == "cmp":
-        im1 = Image.open("my_screenshot0.png").convert('RGB')
-        im2 = Image.open("levels/511.png").convert('RGB')
+        im1 = Image.open("011.png").convert('RGB')
+        im2 = Image.open("levels/011.png").convert('RGB')
         diff = ImageChops.difference(im1, im2)
         result = ImageStat.Stat(diff)
         print("mean=%s" % str(result.mean))
@@ -2362,7 +2378,7 @@ def main_method():
                 if args.briv_boss:
                     # foreground_or_start()
                     debug_print("checking for team on_boss")
-                    if on_boss(fast=True):
+                    if plus and on_boss(fast=True):
                         verbose_print("team is on_boss")
                         pyautogui.press('e')
                         pyautogui.press('g')
