@@ -178,8 +178,8 @@ def safe_image_compare(im1, im2, save=False, max_mean=MAX_TOTAL_IMAGE_MEAN):
     stat = ImageStat.Stat(diff)
     # im1.save("safe_im1.png")
     # im2.save("safe_im2.png")
-    verbose_print("mean=%s" % str(stat.mean))
-    verbose_print("rms=%s" % str(stat.rms))
+    debug_print("mean=%s" % str(stat.mean))
+    debug_print("rms=%s" % str(stat.rms))
 
     match = True
     if (stat.mean[0] + stat.mean[1] + stat.mean[2]) > max_mean:
@@ -276,6 +276,12 @@ def hunt_for_menu(level_images):
                 print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, plus, on_boss()))
                 return top_x, top_y, True
     return 0, 0, False
+
+
+def enter_code(code):
+    for a in code:
+        pyautogui.press(a)
+        time.sleep(0.2)
 
 
 def activate_app(app_name, tries=2, reset_top=False):
@@ -799,6 +805,33 @@ def check_crashed_app():
     click_ok()
     startup_idle_champions()
 
+def restart_steam():
+    print("Quitting Steam")
+    try:
+        app = activate_app("Steam")
+        if app:
+            debug_print("App for CMD-q %s" % app.title)
+            debug_print("Sending CMD-q")
+            pyautogui.hotkey('command', 'q', interval=0.1)
+            # pyautogui.keyDown('command')
+            # pyautogui.press('q')
+            # pyautogui.keyUp('command')
+    except Exception as e:
+        debug_print("ERROR: CMD-q to Steam.app: %s" % e)
+    time.sleep(10.0)
+    short_cut = "/Applications/Steam.app"
+    try:
+        if not os.path.exists(short_cut):
+            print("ERROR: Path to Steam.app is incorrect" % short_cut)
+            sys.exit(1)
+        result = os.system("open '%s'" % short_cut)
+        verbose_print("open shortcut_path (%s) returns %s" % (short_cut, str(result)))
+    except Exception as e:
+        print("ERROR: could not launch %s" % short_cut)
+        print("ERROR: %s" % str(e))
+        sys.exit(1)
+    time.sleep(10.0)
+
 
 def shutdown_app(keyboard=True):
     if keyboard:
@@ -824,7 +857,7 @@ def shutdown_app(keyboard=True):
                 window.close()
                 time.sleep(20.0)
                 return
-            print("Warning: shutdown: '%s' not an exact match for '%s'" % (window.title, APP_name))
+            print("Warning: shutdown: '%s' not an exact match for '%s'" % (window.title, APP_NAME))
         raise gw.PyGetWindowException("No exact match for 'Idle Champions'")
     except Exception as e:
         raise gw.PyGetWindowException("ERROR: shutdown: '%s'" % e)
@@ -832,7 +865,7 @@ def shutdown_app(keyboard=True):
 
 # Startup using Steam App
 # Warning: will shutdown app if running!
-def startup_idle_champions(tries=5):
+def startup_idle_champions(tries=20):
     # TODO: loop on this block until we find menu.png if not using preset top_x, top_y
     # Bring up steam
     print("Restarting Idle Champions")
@@ -905,8 +938,13 @@ def startup_idle_champions(tries=5):
         if click_ok(startup=True, count=20, ic_app=found_app):
             return True
 
+        # Try restarting Steam if this has been going on for a while
+        if attempt > 10:
+            restart_steam()
+
         # Try killing the app and trying again
         shutdown_app(True)
+
 
     return False
 
@@ -916,7 +954,15 @@ def click_ok(count=1, startup=False, ic_app=None):
     found_ok = False
     move = 50
     # loop attempting a "smart" startup using remembered or hinted top_x, top_y
-    known_okays = [(635, 505), (635, 475), (635, 565), (750, 370)]
+    known_okays = [
+            # (635, 633), brings up sentry char sheet
+            (635, 565),
+            (635, 522),
+            (635, 505),
+            (635, 475),
+            (635, 408),
+            (750, 370),
+            ]
     ready = False
     found_menu = False
     for s in range(count, 0, -1):
@@ -937,12 +983,12 @@ def click_ok(count=1, startup=False, ic_app=None):
         found, ready = check_for_menu()
         if ready:
             return True
-        if found_menu:
-            # second check, now need to manually hunt for Okay button
-            break
-        found_menu = found
+        # if found_menu:
+        #     # second check, now need to manually hunt for Okay button
+        #     break
+        # found_menu = found
 
-        if count != 0:
+        if not found and count != 0:
             try:
                 if gw.getActiveWindow().title != APP_NAME:
                     raise Exception("wrong window")
@@ -1657,6 +1703,9 @@ def main_method():
     parser.add_argument("--size", default="small",
                         help="Size of bounties to open (small or medium,default small)",
                         type=str)
+    parser.add_argument("--codes", default="codes.list",
+                        help="List of codes to enter into the chest tool.",
+                        type=str)
     parser.add_argument("-r", "--runloops", default=GEM_LOOPS,
                         help="How many loops gem run (default %d)" % GEM_LOOPS,
                         type=int)
@@ -1899,8 +1948,13 @@ def main_method():
         except Exception as e:
             print("Error: %s" % str(e))
         sys.exit(0)
+        
+    if args.command == "teststeam":
+        restart_steam()
+        sys.exit(0)
 
     if args.command == "testhunt":
+        verbose = True
         print("Test Hunt for Menu ...")
         print("Screen shot in ", end='')
         for i in range(10,0,-1):
@@ -1909,7 +1963,11 @@ def main_method():
         for round in range(0,5):
             print("")
             print("######## Round %d ############" % round)
-            x, y, found = hunt_for_menu(level_images)
+            found, ready = check_for_menu()
+            # x, y, found = hunt_for_menu(level_images)
+            if found:
+                print("Found %s, Ready %s" %(found, ready))
+                break
             if round == 4:
                 break
             print("Next screen shot in ", end='')
@@ -2020,8 +2078,8 @@ def main_method():
         sys.exit(0)
 
     while args.command == "cmp":
-        im1 = Image.open("011.png").convert('RGB')
-        im2 = Image.open("levels/011.png").convert('RGB')
+        im1 = Image.open("my_screenshot0.png").convert('RGB')
+        im2 = Image.open("levels/691.png").convert('RGB')
         diff = ImageChops.difference(im1, im2)
         result = ImageStat.Stat(diff)
         print("mean=%s" % str(result.mean))
@@ -2095,6 +2153,51 @@ def main_method():
         print("mouse: %s" % str(pyautogui.position()))
         break
 
+    if args.command == "codes":
+        last_len = 12
+        next_code_target = with_top_offset(89, 582, as_point=True)
+        unlock_target = with_top_offset(632, 559, as_point=True)
+        toggle_size_target = with_top_offset(63, 669, as_point=True)
+        expired_target = with_top_offset(636, 390, as_point=True)
+        flip_target = with_top_offset(726, 358, as_point=True)
+        close_target = with_top_offset(1265, 12, as_point=True)
+        with open(args.codes, "r") as f:
+            for code in f:
+                code = code.replace('-', '', )
+                code = code.replace(' ', '', )
+                code = code.strip()
+                print("Entering code '%s'" % code)
+                next_code_target = click_with_position("unlock.png", next_code_target)
+                time.sleep(2.5)
+
+                # wait for the code screen
+                if len(code) == 12:
+                    if last_len != 12:
+                        last_len = 12
+                        print("Click mode button")
+                        toggle_size_target = click_with_position("sizebutton.png", toggle_size_target)
+                elif len(code) == 16:
+                    if last_len != 16:
+                        last_len = 16
+                        print("Click mode button")
+                        toggle_size_target = click_with_position("sizebutton.png", toggle_size_target)
+                else:
+                    print("IGNORING: %s (len %d)" %(code, len(code)))
+                    continue
+                enter_code(code)
+                time.sleep(3.5)
+                unlock_target = click_with_position("unlock.png", unlock_target)
+                time.sleep(6.0)
+                flip_target = click_with_position("flip.png", flip_target)
+                time.sleep(0.2)
+                expired_target = click_with_position("expired.png", expired_target)
+                time.sleep(4.0)
+                flip_target = click_with_position("flip.png", flip_target)
+                time.sleep(0.2)
+                close_target = click_with_position("close.png", close_target)
+                time.sleep(2.0)
+        sys.exit(1)
+
     if args.command == "bounty" or args.command == "small" or args.command == "medium":
         start_image = "bountysmall.png"
         bounty_size = "small"
@@ -2139,31 +2242,31 @@ def main_method():
         go_target = None
         flip_target = None
         done_target = None
+        delay = 2.5
+        if args.command == "gold":
+            delay = 7
         while True:
             loops += 1
             print("Opening 50 silver chests batch %d of %d" % (loops, args.loops))
             # inventory_target = click_with_position("openinventory.png", inventory_target, 40, 100)
             # move_to_menu()
             # time.sleep(2)
-            click_offset(132, 126, duration=mouse_move_speed, delay=0.5)
+            click_offset(132, 126, duration=mouse_move_speed, delay=0.75)
             # bar_target = click_with_position("bountybar.png", bar_target)
-            click_offset(744, 385, duration=mouse_move_speed, delay=0.5)
+            click_offset(744, 385, duration=mouse_move_speed, delay=0.75)
             # go_target = click_with_position("openopen.png", go_target, click=False)
-            delay = 2.5
-            if args.command == "gold":
-                delay = 4.5
             click_offset(551, 431, duration=mouse_move_speed, delay=delay)
             # flip_target = click_with_position("openflip.png", flip_target)
             click_offset(726, 359, duration=mouse_move_speed, delay=delay)
             # click in same place for show all
             # flip_target = click_with_position("openflip.png", flip_target)
-            click_offset(726, 359, duration=mouse_move_speed, delay=2.5)
+            click_offset(726, 359, duration=mouse_move_speed, delay=delay)
             # done_target = click_with_position("opendone.png", done_target)
 
             pyautogui.press("esc")
 
             # pyautogui.moveRel(300, 0, duration=0.0)
-            time.sleep(0.5)
+            time.sleep(1.75)
             if loops >= args.loops:
                 sys.exit(1)
 
@@ -2220,10 +2323,17 @@ def main_method():
         for i in range(1,args.loops+1):
             now = datetime.datetime.now()
             print("Jimmy loops %d of %d (%s)" % (i, args.loops, str(now)))
+            print("Next attack in ", end='', flush=True)
+            for s in range(int(args.charge), 0, -1):
+                print(" %d ..." % s, end='', flush=True)
+                time.sleep(1.0)
+            print("Attack!")
             pyautogui.press('g')
-            time.sleep(0.5)
-            pyautogui.press('w')
             time.sleep(3.0)
+            pyautogui.press('q')
+            time.sleep(12.0)
+            pyautogui.press('w')
+            time.sleep(10.0)
             pyautogui.press('e')
             # level, plus = finder.get_current_zone()
             # need images for the above
@@ -2239,25 +2349,34 @@ def main_method():
                 pyautogui.press('left')
                 sys.exit(0)
             
-            time.sleep(args.charge)
+            # time.sleep(args.charge)
+
             # click back to 1
-            for j in range(0,4):
+            for j in range(0,3):
                 pyautogui.keyDown('shift')
-                time.sleep(0.1)
                 click_offset(924, 105)
                 pyautogui.keyUp('shift')
-                time.sleep(1.0)
+                time.sleep(0.5)
                 click_offset(971, 106)
-                time.sleep(3.0)
+                time.sleep(1.5)
+                # time.sleep(0.1)
                 pyautogui.keyDown('shift')
-                time.sleep(0.1)
                 click_offset(924, 105)
                 pyautogui.keyUp('shift')
-                time.sleep(1.0)
+                time.sleep(0.5)
                 click_offset(971, 106)
                 pyautogui.keyUp('shift')
-            time.sleep(args.charge)
+                time.sleep(1.5)
         sys.exit(0)
+
+    finder = None
+    while args.command == "zone2":
+        if not finder:
+            finder = LevelFinder()
+        level, plus = finder.get_current_zone(True)
+        print("Zone found %d (at start zone: %s), (on_boss: %s)" % (level, not plus, on_boss()))
+        if level <= 0:
+            print("Could not find zone, zone image saved in my_screenshot*.png")
 
     if args.command == "modron":
         infinite_loop = True
@@ -2304,11 +2423,12 @@ def main_method():
             if last_level == level and level > 0:
                 # check delta
                 delta = (now - last_level_time).total_seconds()
-                if delta > 45:
+                if delta > 30:
                     # try 'q' 'g' to see if it unsticks
                     pyautogui.press('q')
                     pyautogui.press('g')
                     pyautogui.press('q')
+                    time.sleep(5.0)
                 if delta > 90:
                     print("Error stuck at zone %s at %s for %d seconds ..." % (level, datetime.datetime.now(), delta))
                     # kill the app and restart
@@ -2319,10 +2439,15 @@ def main_method():
                 last_level = level
                 last_level_time = now
             if level <= 0:
+                verbose_print("Error: is restart needed?")
                 try:
-                    verbose_print("Error: is restart needed?")
                     accept_screen_share(args.screenshare)
-                    foreground_or_start()
+                    shutdown_app(args.keyboard_shutdown)
+                except Exception as e:
+                    pass
+                time.sleep(1.0)
+                try:
+                    foreground_or_start(tries=5)
                     # TODO: Need to be able to see if in auto or ran by end zone or ... or maybe if stuck triggered?
                     # time.sleep(1.0)
                     # pyautogui.press("g")
@@ -2381,16 +2506,17 @@ def main_method():
                     if plus and on_boss(fast=True):
                         verbose_print("team is on_boss")
                         pyautogui.press('e')
-                        pyautogui.press('g')
-                        while not zone_complete():
-                            # print("zone uncomplete")
+                        # wait until on next level
+                        # new_level = level
+                        # while new_level == level:
+                        #     new_level, new_plus = finder.get_current_zone()
+                        while on_boss(fast=True):
                             pass
+                        # resume
                         pyautogui.press('q')
                         time.sleep(0.5)
-                        pyautogui.press('g')
-                        time.sleep(0.5)
                         pyautogui.press('q')
-                        time.sleep(1.0)
+                        time.sleep(0.5)
                     if args.screenshare:
                         accept_screen_share(args.screenshare)
                 else:
@@ -2539,6 +2665,7 @@ def main_method():
                 blue, grey = check_for_menu()
                 if blue or grey:
                     break
+
 
             # We are now on Level 1: Time to GO
             # Drop Fams First
